@@ -3,6 +3,7 @@ import { presentOnFrame } from './trials.js';
 import { shuffle } from '../core.js';
 
 const colors = [{ name: '红', css: '#c44343' }, { name: '蓝', css: '#3275bf' }, { name: '绿', css: '#27805e' }, { name: '紫', css: '#8d53b1' }, { name: '橙', css: '#b86b14' }, { name: '黑', css: '#333333' }];
+const sixColors = [colors[0], colors[1], colors[2], { name: '黄', css: '#bd8b00' }, colors[3], { name: '粉', css: '#c83c87' }];
 const pick = (items, random) => items[Math.floor(random() * items.length)];
 export const choiceFields = {
   count: { key: 'count', label: '题数', type: 'number', default: 30, min: 10, max: 100, step: 1 },
@@ -12,11 +13,11 @@ export const choiceFields = {
   validRate: { key: 'validRate', label: '有效线索', type: 'number', default: 80, min: 10, max: 90, step: 5, unit: '%' },
 };
 
-export function choiceTrial(kind, settings, random = Math.random, index = 0) {
-  const direction = random() < 0.5 ? 0 : 1;
-  const conflict = random() < (kind === 'posner-cue' ? 1 - (settings.validRate ?? 80) / 100 : 0.5);
+export function choiceTrial(kind, settings, random = Math.random, index = 0, previousRule, target) {
+  const direction = target?.direction ?? (random() < 0.5 ? 0 : 1);
+  const conflict = random() < (kind === 'posner-cue' ? 1 - (settings.validRate ?? 80) / 100 : kind === 'stroop' ? 1 - (settings.congruentRate ?? 50) / 100 : 0.5);
   if (kind === 'flanker') {
-    const group = settings.neutral && random() < 1 / 3 ? 'neutral' : conflict ? 'conflict' : 'congruent';
+    const group = target?.group ?? (settings.neutral && random() < 1 / 3 ? 'neutral' : conflict ? 'conflict' : 'congruent');
     const center = direction ? '→' : '←';
     const side = group === 'neutral' ? '―' : group === 'conflict' ? (direction ? '←' : '→') : center;
     const half = Math.floor((settings.arrows ?? 5) / 2);
@@ -31,12 +32,12 @@ export function choiceTrial(kind, settings, random = Math.random, index = 0) {
     return { cue: cue ? '→' : '←', stimulus: direction ? '□　●' : '●　□', options: ['←', '→'], answer: direction, group: conflict ? 'invalid' : 'valid' };
   }
   if (kind === 'task-switching') {
-    const rule = settings.order === 'alternate' ? index % 2 : Math.floor(random() * 2);
+    const rule = settings.order === 'alternate' ? index % 2 : previousRule === undefined ? Math.floor(random() * 2) : random() < (settings.switchRate ?? 50) / 100 ? 1 - Number(previousRule) : Number(previousRule);
     const shape = random() < 0.5 ? 0 : 1;
     return { stimulus: `<span style="color:${direction ? '#3275bf' : '#c44343'}">${shape ? '▲' : '●'}</span>`, hint: rule ? '判断形状' : '判断颜色', options: rule ? ['圆', '三角'] : ['红', '蓝'], answer: rule ? shape : direction, group: String(rule) };
   }
   if (kind === 'stroop') {
-    const palette = colors.slice(0, settings.colors ?? 3);
+    const palette = (settings.palette === 'six' ? sixColors : colors).slice(0, settings.colors ?? 3);
     const ink = Math.floor(random() * palette.length);
     const word = conflict ? pick(palette.map((_, i) => i).filter((i) => i !== ink), random) : ink;
     const variant = settings.variant ?? 'ink';
@@ -46,8 +47,9 @@ export function choiceTrial(kind, settings, random = Math.random, index = 0) {
     return { stimulus: `<span style="color:${palette[ink].css}">${palette[word].name}</span>`, hint: variant === 'word' ? '选择字义' : '选择文字的颜色', options: palette.map((color) => `${color.name}色`), answer, group: conflict ? 'conflict' : 'congruent' };
   }
   if (kind === 'number-comparison') {
-    const a = Math.floor(random() * 99) + 1;
-    const b = (a + Math.floor(random() * 98)) % 99 + 1;
+    const a = Math.floor(random() * 90) + 10;
+    const candidates = Array.from({ length: 90 }, (_, i) => i + 10).filter((value) => Math.abs(value - a) >= 2);
+    const b = pick(candidates, random);
     return { stimulus: '选择较大的数字', options: [String(a), String(b)], answer: a > b ? 0 : 1, group: 'comparison' };
   }
   const limit = settings.variant === 'two-digit' ? 90 : 9;
@@ -58,6 +60,11 @@ export function choiceTrial(kind, settings, random = Math.random, index = 0) {
   const result = operator === '÷' ? a : operator === '×' ? a * b : operator === '+' ? a + b : a - b;
   const options = shuffle([result, result + 1, result - 1, result + 2], random);
   return { stimulus: `${left} ${operator} ${b}`, options: options.map(String), answer: options.indexOf(result), group: operator };
+}
+
+export function flankerSchedule(random = Math.random) {
+  const balanced = (group, count) => Array.from({ length: count }, (_, i) => ({ group, direction: i % 2 }));
+  return [...shuffle([...balanced('congruent', 2), ...balanced('conflict', 2)], random), ...shuffle([...balanced('congruent', 16), ...balanced('conflict', 16), ...balanced('neutral', 8)], random)];
 }
 
 export function choiceMetrics(trials) {
@@ -77,6 +84,7 @@ export function mountChoices({ root, mode, preset, settings, onFinish, random = 
   const runtime = createRuntime({ onFinish, clock });
   const values = { ...preset.settings, ...settings };
   const trials = [];
+  const schedule = values.balancedFlanker ? flankerSchedule(random) : null;
   const inputs = trackInputs();
   const start = runtime.now();
   const deadline = values.duration ? start + values.duration * 1000 : Infinity;
@@ -85,6 +93,7 @@ export function mountChoices({ root, mode, preset, settings, onFinish, random = 
   let current;
   let accepting = false;
   let previousGroup;
+  let practiceConfirmed = false;
   const finish = () => {
     accepting = false;
     const scoredTrials = trials.filter((trial) => !trial.practice);
@@ -92,13 +101,23 @@ export function mountChoices({ root, mode, preset, settings, onFinish, random = 
     const groupPair = kind === 'posner-cue' ? ['invalid', 'valid'] : kind === 'task-switching' ? ['switch', 'repeat'] : ['conflict', 'congruent'];
     const [first, second] = groupPair.map((key) => metrics.groups[key]?.meanMs);
     metrics.effectMs = Number.isFinite(first) && Number.isFinite(second) ? first - second : null;
-    const score = kind === 'number-comparison' ? metrics.correct : values.penalty ? (metrics.meanMs === null ? null : (metrics.meanMs + metrics.errors * values.penalty) / 1000) : scoredTrials.length ? Math.round(metrics.correct / scoredTrials.length * 100) : null;
+    if (kind === 'number-comparison') {
+      metrics.accuracy = scoredTrials.length ? metrics.correct / scoredTrials.length * 100 : 0;
+      metrics.targetAttempts = 25;
+      metrics.challenge = scoredTrials.length >= 25 && metrics.accuracy >= 90 ? '达标' : '未达标';
+    }
+    const score = kind === 'number-comparison' ? metrics.correct : kind === 'posner-cue' ? metrics.meanMs : values.penalty ? (metrics.meanMs === null ? null : Math.round(metrics.meanMs + metrics.errors * values.penalty) / 1000) : scoredTrials.length ? Math.round(metrics.correct / scoredTrials.length * 100) : null;
     runtime.finish({ value: score, detail: `${scoredTrials.length} 题中答对 ${metrics.correct} 题`, mode: mode.id, preset: preset.id, settings: values, rules: mode.ruleVersion, input: inputs.value, endReason: values.duration ? 'timeout' : 'completed', scored: score !== null, metrics, trials });
   };
   const advance = () => {
     if (runtime.now() >= deadline || (values.count && trials.length >= values.count + (values.practice ?? 0))) { finish(); return; }
+    if (values.practice && trials.length === values.practice && !practiceConfirmed) {
+      accepting = false;
+      root.innerHTML = '<div class="empty-state"><p>练习完成, 接下来开始正式测试.</p><button class="button primary" data-continue>开始测试</button></div>';
+      return;
+    }
     accepting = false;
-    current = choiceTrial(kind, values, random, trials.length);
+    current = choiceTrial(kind, values, random, trials.length, previousGroup, schedule?.[trials.length]);
     if (kind === 'task-switching') { current.rule = current.group; current.group = previousGroup === undefined ? 'first' : previousGroup === current.rule ? 'repeat' : 'switch'; previousGroup = current.rule; }
     const show = () => presentOnFrame(runtime, () => {
       root.innerHTML = `<div class="game-status"><span>${trials.length < (values.practice ?? 0) ? `练习 ${trials.length + 1} / ${values.practice}` : values.duration ? `剩余 ${Math.max(0, Math.ceil((deadline - runtime.now()) / 1000))} 秒` : `第 ${trials.length + 1 - (values.practice ?? 0)} / ${values.count} 题`}</span><span>${current.hint ?? ''}</span></div><div class="stimulus">${current.stimulus}</div><div class="answer-options">${current.options.map((item, i) => `<button class="answer-button" data-choice="${i}">${item}</button>`).join('')}</div><p class="stage-note">点击选项或按对应数字键</p>`;
@@ -109,6 +128,9 @@ export function mountChoices({ root, mode, preset, settings, onFinish, random = 
     if (current.cue) {
       root.innerHTML = `<div class="stimulus fixation">${current.cue}</div>`;
       runtime.later(show, 300);
+    } else if (values.fixation) {
+      root.innerHTML = '<div class="stimulus fixation">+</div>';
+      runtime.later(show, values.fixation);
     } else show();
   };
   const record = (answer, at, input) => {
@@ -117,9 +139,19 @@ export function mountChoices({ root, mode, preset, settings, onFinish, random = 
     accepting = false;
     runtime.cancel(timer);
     if (input !== 'any') inputs.add(input);
-    trials.push({ group: current.group, correct: answer === current.answer, responseMs: answer === null ? null : Math.max(0, at - shownAt), answer, target: current.answer, practice: trials.length < (values.practice ?? 0) });
-    advance();
+    const correct = answer === current.answer;
+    trials.push({ group: current.group, correct, responseMs: answer === null ? null : Math.max(0, at - shownAt), answer, target: current.answer, practice: trials.length < (values.practice ?? 0) });
+    if (values.feedback) {
+      root.innerHTML = `<div class="stimulus">${answer === null ? '未响应' : correct ? '正确' : '错误'}</div>`;
+      runtime.later(advance, values.feedback);
+    } else advance();
   };
+  runtime.listen(root, 'click', (event) => {
+    if (!event.target.closest('[data-continue]')) return;
+    practiceConfirmed = true;
+    root.innerHTML = '<div class="stimulus">准备</div>';
+    runtime.later(advance, values.initialDelay ?? 0);
+  });
   runtime.listen(root, 'pointerdown', (event) => {
     const button = event.target.closest('[data-choice]');
     if (!button || event.button !== 0) return;
@@ -132,6 +164,7 @@ export function mountChoices({ root, mode, preset, settings, onFinish, random = 
     event.preventDefault(); record(index, inputTime(event, runtime.now), inputMethod(event));
   });
   if (values.duration) runtime.later(finish, values.duration * 1000);
-  advance();
+  if (values.initialDelay) { root.innerHTML = '<div class="stimulus">准备</div>'; runtime.later(advance, values.initialDelay); }
+  else advance();
   return runtime.cleanup;
 }
