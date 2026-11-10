@@ -8,7 +8,7 @@ export const definition = {
     id: 'timed', name: '火柴算式', ruleVersion: 2,
     presets: grades.map((_, index) => ({ id: `grade-${index + 1}`, name: `${index + 1} 年级`, settings: { grade: index + 1 } })),
     score: { unit: '关', lower: false, min: 0 }, hiddenPolicy: 'invalidate',
-    inputs: ['pointer'], rule: '移动恰好一根线段, 使算式成立. 可改变数字和加减号.'
+    inputs: ['pointer', 'touch', 'keyboard', 'mixed'], rule: '移动恰好一根线段, 使算式成立. 可改变数字和加减号.'
   }]
 };
 
@@ -93,6 +93,7 @@ export function mount({ root, mode, preset, settings, onFinish, random = Math.ra
   let message = '';
   let timer;
   let active = true;
+  const inputs = trackInputs();
   const cleanup = () => { active = false; controller.abort(); clock.clearTimeout(timer); };
   const draw = () => {
     const tokens = question.tokens.map((token, index) => {
@@ -116,14 +117,13 @@ export function mount({ root, mode, preset, settings, onFinish, random = Math.ra
     if (!remaining) {
       const duration = (clock.performance.now() - started) / 1000;
       cleanup();
-      onFinish({ value: completed, detail: `完成 ${completed} 关, 尝试错误 ${mistakes} 次`, duration, mode: mode.id, preset: preset.id, settings, rules: mode.ruleVersion, input: 'pointer', endReason: 'timeout', scored: true, metrics: { completed, mistakes }, trials: [] });
+      onFinish({ value: completed, detail: `完成 ${completed} 关, 尝试错误 ${mistakes} 次`, duration, mode: mode.id, preset: preset.id, settings, rules: mode.ruleVersion, input: inputs.value, endReason: 'timeout', scored: true, metrics: { completed, mistakes }, trials: [] });
     } else timer = clock.setTimeout(tick, Math.min(100, remaining));
   };
-  root.addEventListener('click', (event) => {
-    if (!active || clock.performance.now() >= deadline) return;
-    if (event.target.closest('button[data-reset]')) { selected = null; message = ''; draw(); return; }
-    const button = event.target.closest('button[data-segment]');
-    if (!button) return;
+  bindBoardButtons(root, 'button[data-segment], button[data-reset]', (button, input, at) => {
+    if (!active || at >= deadline) return;
+    inputs.add(input);
+    if ('reset' in button.dataset) { selected = null; message = ''; draw(); return; }
     const position = { index: Number(button.dataset.index), segment: Number(button.dataset.segment) };
     const lit = question.tokens[position.index].mask & (1 << position.segment);
     if (lit) { selected = position; message = '选择放置线段的空位'; draw(); return; }
@@ -131,8 +131,10 @@ export function mount({ root, mode, preset, settings, onFinish, random = Math.ra
     const result = moveMatch(question.tokens, selected, position);
     if (result && readEquation(result).valid) { completed++; message = '正确'; next(); }
     else { selected = null; mistakes++; message = '算式未成立, 请重试'; draw(); }
-  }, { signal: controller.signal });
+  }, controller.signal, () => clock.performance.now());
   next();
   tick();
   return cleanup;
 }
+import { bindBoardButtons, trackInputs } from '../engines/board-input.js';
+
