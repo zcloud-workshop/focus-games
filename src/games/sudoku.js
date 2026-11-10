@@ -7,9 +7,9 @@ const templates = {
   hard: '020406089450000103009000400030007890000800004890200007040070900600012045012305000',
 };
 const presets = [
-  { id: 'easy', name: '简单', settings: { difficulty: 'easy' } },
-  { id: 'normal', name: '普通', settings: { difficulty: 'normal' } },
-  { id: 'hard', name: '困难', settings: { difficulty: 'hard' } },
+  { id: 'easy', name: '简单', settings: { difficulty: 'easy', assisted: false } },
+  { id: 'normal', name: '普通', settings: { difficulty: 'normal', assisted: false } },
+  { id: 'hard', name: '困难', settings: { difficulty: 'hard', assisted: false } },
 ];
 
 export const definition = {
