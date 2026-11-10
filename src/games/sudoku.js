@@ -1,5 +1,7 @@
 import { shuffle } from '../core.js';
 import { solveSudoku } from '../engines/boards.js';
+import { bindBoardButtons, trackInputs } from '../engines/board-input.js';
+import { inputTime } from '../engines/runtime.js';
 
 const templates = {
   easy: '020406089450000123009000406030507890000890234891230507040070902600012045012305670',
@@ -15,8 +17,8 @@ const presets = [
 export const definition = {
   id: 'sudoku',
   modes: [
-    { id: 'basic', name: '数独', ruleVersion: 2, presets, score: { unit: '秒', lower: true, min: 0 }, hiddenPolicy: 'invalidate', inputs: ['pointer', 'keyboard'], rule: '每行、每列和每宫各填 1-9, 最多错 3 次.' },
-    { id: 'notes', name: '数独笔记', ruleVersion: 2, presets, score: { unit: '秒', lower: true, min: 0 }, hiddenPolicy: 'invalidate', inputs: ['pointer', 'keyboard'], rule: '每行、每列和每宫各填 1-9, 可用笔记和提示, 最多错 3 次.' },
+    { id: 'basic', name: '数独', ruleVersion: 2, presets, score: { unit: '秒', lower: true, min: 0 }, hiddenPolicy: 'invalidate', inputs: ['pointer', 'touch', 'keyboard', 'mixed'], rule: '每行、每列和每宫各填 1-9, 最多错 3 次.' },
+    { id: 'notes', name: '数独笔记', ruleVersion: 2, presets, score: { unit: '秒', lower: true, min: 0 }, hiddenPolicy: 'invalidate', inputs: ['pointer', 'touch', 'keyboard', 'mixed'], rule: '每行、每列和每宫各填 1-9, 可用笔记和提示, 最多错 3 次.' },
   ]
 };
 
@@ -40,7 +42,7 @@ export function mount({ root, mode, preset, settings, onFinish, random = Math.ra
   let noteMode = false;
   let errors = 0;
   let hints = 0;
-  let lastInput = 'pointer';
+  const inputs = trackInputs();
   let active = true;
   const cleanup = () => { active = false; controller.abort(); };
   const draw = () => {
@@ -50,16 +52,16 @@ export function mount({ root, mode, preset, settings, onFinish, random = Math.ra
       const col = index % 9;
       const bg = selected === index ? '#a9cce8' : value && value === selectedValue ? '#d5e8f7' : 'var(--soft, #eee)';
       const content = value || [...notes[index]].sort().join('');
-      return `<button data-cell="${index}" aria-label="第 ${row + 1} 行第 ${col + 1} 列${initial[index] ? '已知' : ''}, ${value || '空'}" style="aspect-ratio:1;min-width:0;padding:0;border:1px solid #aaa;${col % 3 === 0 ? 'border-left:2px solid #555;' : ''}${row % 3 === 0 ? 'border-top:2px solid #555;' : ''}background:${bg};color:${initial[index] ? '#222' : '#17639c'};font-size:${value ? 'clamp(14px,4vw,22px)' : '9px'}">${content}</button>`;
+      return `<button data-cell="${index}" aria-label="第 ${row + 1} 行第 ${col + 1} 列${initial[index] ? '已知' : ''}, ${value || '空'}" style="aspect-ratio:1;min-width:0;padding:0;border:1px solid #aaa;${col % 3 === 0 ? 'border-left:2px solid #555;' : ''}${row % 3 === 0 ? 'border-top:2px solid #555;' : ''}background:${bg};color:${selected === index || value && value === selectedValue ? '#173b57' : 'var(--ink)'};font-weight:${initial[index] ? '600' : '400'};font-size:${value ? 'clamp(14px,4vw,22px)' : '9px'}">${content}</button>`;
     }).join('');
     root.innerHTML = `<div class="game-status"><span>错误 ${errors} / 3</span><span>${noteMode ? '笔记' : '填写'}</span></div><div class="play-grid" style="--columns:9;gap:0;max-width:450px">${cells}</div><div class="play-grid" style="--columns:9;gap:2px;margin-top:12px">${Array.from({ length: 9 }, (_, i) => `<button class="answer-button" data-number="${i + 1}" style="padding:6px">${i + 1}</button>`).join('')}</div><div class="answer-options"><button class="answer-button" data-action="erase">擦除</button>${mode.id === 'notes' ? `<button class="answer-button" data-action="notes">${noteMode ? '关闭笔记' : '笔记 (N)'}</button><button class="answer-button" data-action="hint">提示</button>` : ''}</div>`;
   };
-  const finish = (completed) => {
-    const duration = (clock.performance.now() - started) / 1000;
+  const finish = (completed, at) => {
+    const duration = Math.max(0, at - started) / 1000;
     cleanup();
-    onFinish({ value: duration, detail: completed ? `完成数独, 错误 ${errors} 次, 提示 ${hints} 次` : '错误达到 3 次', duration, mode: mode.id, preset: preset.id, settings: { ...settings, assisted: hints > 0 }, rules: mode.ruleVersion, input: lastInput, endReason: completed ? 'complete' : 'mistakes', scored: completed, metrics: { errors, hints }, trials: [] });
+    onFinish({ value: duration, detail: completed ? `完成数独, 错误 ${errors} 次, 提示 ${hints} 次` : '错误达到 3 次', duration, mode: mode.id, preset: preset.id, settings: { ...settings, assisted: hints > 0 }, rules: mode.ruleVersion, input: inputs.value, endReason: completed ? 'complete' : 'mistakes', scored: completed, metrics: { errors, hints }, trials: [] });
   };
-  const input = (value) => {
+  const input = (value, at) => {
     if (selected === null || initial[selected] || !active) return;
     if (value === 0) { board[selected] = 0; notes[selected].clear(); draw(); return; }
     if (noteMode && !board[selected]) {
@@ -69,32 +71,31 @@ export function mount({ root, mode, preset, settings, onFinish, random = Math.ra
       notes[selected].clear();
     } else {
       errors++;
-      if (errors >= 3) { finish(false); return; }
+      if (errors >= 3) { finish(false, at); return; }
     }
-    if (board.every((cell, index) => cell === solution[index])) finish(true);
+    if (board.every((cell, index) => cell === solution[index])) finish(true, at);
     else draw();
   };
-  root.addEventListener('click', (event) => {
-    lastInput = 'pointer';
-    const cell = event.target.closest('button[data-cell]');
-    if (cell) { selected = Number(cell.dataset.cell); draw(); return; }
-    const number = event.target.closest('button[data-number]');
-    if (number) { input(Number(number.dataset.number)); return; }
-    const action = event.target.closest('button[data-action]')?.dataset.action;
-    if (action === 'erase') input(0);
+  bindBoardButtons(root, 'button[data-cell], button[data-number], button[data-action]', (button, method, at) => {
+    inputs.add(method);
+    if ('cell' in button.dataset) { selected = Number(button.dataset.cell); draw(); return; }
+    if ('number' in button.dataset) { input(Number(button.dataset.number), at); return; }
+    const action = button.dataset.action;
+    if (action === 'erase') input(0, at);
     if (action === 'notes') { noteMode = !noteMode; draw(); }
     if (action === 'hint') {
       const index = selected !== null && !initial[selected] && !board[selected] ? selected : board.findIndex((value) => !value);
       if (index < 0) return;
       selected = index; board[index] = solution[index]; notes[index].clear(); hints++;
-      if (board.every((cell, cellIndex) => cell === solution[cellIndex])) finish(true); else draw();
+      if (board.every((cell, cellIndex) => cell === solution[cellIndex])) finish(true, at); else draw();
     }
-  }, { signal: controller.signal });
+  }, controller.signal, () => clock.performance.now());
   document.addEventListener('keydown', (event) => {
     if (event.repeat || event.target.matches('input, textarea, select')) return;
-    if (/^[1-9]$/.test(event.key)) { lastInput = 'keyboard'; input(Number(event.key)); }
-    else if (event.key === 'Backspace' || event.key === 'Delete') { event.preventDefault(); lastInput = 'keyboard'; input(0); }
-    else if (event.key.toLowerCase() === 'n' && mode.id === 'notes') { noteMode = !noteMode; draw(); }
+    const at = inputTime(event, () => clock.performance.now());
+    if (/^[1-9]$/.test(event.key)) { inputs.add('keyboard'); input(Number(event.key), at); }
+    else if (event.key === 'Backspace' || event.key === 'Delete') { event.preventDefault(); inputs.add('keyboard'); input(0, at); }
+    else if (event.key.toLowerCase() === 'n' && mode.id === 'notes') { inputs.add('keyboard'); noteMode = !noteMode; draw(); }
   }, { signal: controller.signal });
   draw();
   return cleanup;
