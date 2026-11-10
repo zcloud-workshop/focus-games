@@ -62,3 +62,16 @@ export function unfoldHole(hole, folds) {
   }
   return [...new Map(points.map((point) => [point.join(','), point])).values()].sort((a, b) => a[1] - b[1] || a[0] - b[0]);
 }
+
+export function matrixQuestion(attributes, complex = false, random = Math.random) {
+  const maps = Array.from({ length: attributes }, () => shuffle([0, 1, 2], random));
+  const cells = Array.from({ length: 9 }, (_, index) => {
+    const row = Math.floor(index / 3);
+    const col = index % 3;
+    return maps.map((map, attribute) => map[(row + col * (complex && attribute % 2 ? 2 : 1)) % 3]);
+  });
+  const correct = cells[8];
+  const options = [correct, ...Array.from({ length: 3 }, (_, index) => correct.map((value, attribute) => attribute === index % attributes ? (value + 1 + Math.floor(index / attributes)) % 3 : value))];
+  const choices = shuffle(options, random);
+  return { cells, choices, answer: choices.indexOf(correct) };
+}
