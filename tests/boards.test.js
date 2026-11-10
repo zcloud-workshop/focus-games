@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { addMergeTile, canMergeMove, createMaze, createSliding, mergeLine, moveMaze, moveMerge, moveSliding, slidingNeighbors, solvedSliding } from '../src/engines/boards.js';
+import { addMergeTile, canMergeMove, createLights, createMaze, createSliding, mergeLine, moveMaze, moveMerge, moveSliding, slidingNeighbors, solveLights, solvedSliding, toggleLights } from '../src/engines/boards.js';
 
 test('数字合并一回合中每个方块最多参与一次合并', () => {
   assert.deepEqual(mergeLine([2, 2, 2, 2]), { line: [4, 4, 0, 0], score: 8 });
@@ -24,6 +24,19 @@ test('生成迷宫始终可从起点到达终点, 墙体阻止移动', () => {
     }
     assert.equal(seen.has(maze.end), true);
     assert.equal(moveMaze(maze, maze.start, 'up'), maze.start);
+  }
+});
+
+test('熄灯盘面可解, 解的最短步数落在所选档位', () => {
+  let state = 42;
+  const random = () => { state = (state * 1664525 + 1013904223) >>> 0; return state / 2 ** 32; };
+  for (const [min, max] of [[3, 5], [6, 8], [9, 15]]) {
+    for (let sample = 0; sample < 10; sample++) {
+      const { board, solution } = createLights(min, max, random);
+      assert.ok(solution.length >= min && solution.length <= max);
+      assert.equal(board.reduce((current, _, index) => solution.includes(index) ? toggleLights(current, index) : current, board).some(Boolean), false);
+      assert.equal(solveLights(board).length, solution.length);
+    }
   }
 });
 
