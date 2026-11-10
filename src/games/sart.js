@@ -10,5 +10,5 @@ export const definition = { id: 'sart', modes: [{ id: 'digits', name: '数字警
     { key: 'window', label: '响应窗', type: 'number', default: 1000, min: 300, max: 3000, step: 100, unit: '毫秒' },
     { key: 'interval', label: '间隔', type: 'number', default: 400, min: 0, max: 2000, step: 100, unit: '毫秒' },
   ] },
-], score: { unit: '%', lower: false, min: 0, max: 100 }, hiddenPolicy: 'invalidate', inputs: ['pointer', 'keyboard'], rule: '数字出现时响应, 看到 3 时不响应. 分别记录漏按和误按.' }] };
+], score: { unit: '%', lower: false, min: 0, max: 100 }, hiddenPolicy: 'invalidate', inputs: ['pointer', 'touch', 'keyboard'], rule: '数字出现时响应, 看到 3 时不响应. 分别记录漏按和误按.' }] };
 export const mount = (options) => mountInhibition({ ...options, kind: 'sart' });
