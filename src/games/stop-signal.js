@@ -8,5 +8,5 @@ export const definition = { id: 'stop-signal', modes: [{ id: 'stop', name: '停�
     { key: 'window', label: '响应窗', type: 'number', default: 1200, min: 500, max: 3000, step: 100, unit: '毫秒' },
     { key: 'delay', label: '停止延迟', type: 'number', default: 250, min: 50, max: 1000, step: 50, unit: '毫秒' },
   ] },
-], validateSettings: (settings) => settings.delay >= settings.window ? '停止延迟必须短于响应窗.' : '', score: { unit: '%', lower: false, min: 0, max: 100 }, hiddenPolicy: 'invalidate', inputs: ['pointer', 'keyboard'], rule: '按箭头方向响应. 出现红框时停止响应, 成绩为停止试次的正确率.' }] };
+], validateSettings: (settings) => settings.delay >= settings.window ? '停止延迟必须短于响应窗.' : '', score: { unit: '%', lower: false, min: 0, max: 100 }, hiddenPolicy: 'invalidate', inputs: ['pointer', 'touch', 'keyboard'], rule: '按箭头方向响应. 出现红框时停止响应, 成绩为停止试次的正确率.' }] };
 export const mount = (options) => mountInhibition({ ...options, kind: 'stop-signal' });
