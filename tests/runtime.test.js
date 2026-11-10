@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createRuntime, inputTime } from '../src/engines/runtime.js';
+import { createRuntime, inputTime, inputMethod, trackInputs } from '../src/engines/runtime.js';
 import { meanValidResponses, presentOnFrame } from '../src/engines/trials.js';
 import { breathPhase } from '../src/games/breath.js';
 
@@ -48,6 +48,39 @@ test('呈现与响应时间使用帧和输入事件时间, 无有效样本不造
   assert.equal(meanValidResponses([{ valid: false, responseMs: 0 }]), null);
   assert.equal(meanValidResponses([{ valid: true, responseMs: 200 }, { valid: true, responseMs: 300 }, { valid: false, responseMs: 1 }]), 250);
   runtime.cleanup();
+});
+
+test('显式有效时长优先, 无效时长使用运行时实际时长', () => {
+  const clock = fakeClock();
+  const results = [];
+  const first = createRuntime({ clock, onFinish: (result) => results.push(result) });
+  clock.advance(10000);
+  first.finish({ value: 1, duration: 3 });
+  const second = createRuntime({ clock, onFinish: (result) => results.push(result) });
+  clock.advance(12000);
+  second.finish({ value: 1, duration: -1 });
+  assert.deepEqual(results.map((result) => result.duration), [3, 2]);
+});
+
+test('只记录实际输入方式, 未知输入不冒充键盘或触屏', () => {
+  assert.equal(inputMethod({ type: 'keydown' }), 'keyboard');
+  assert.equal(inputMethod({ type: 'click', detail: 0 }), 'keyboard');
+  assert.equal(inputMethod({ type: 'pointerdown', pointerType: 'touch' }), 'touch');
+  assert.equal(inputMethod({ type: 'pointerdown', pointerType: 'mouse' }), 'pointer');
+  assert.equal(inputMethod({ type: 'input' }), 'unknown');
+  const tracker = trackInputs();
+  assert.equal(tracker.value, 'unknown');
+  tracker.add({ type: 'pointerdown', pointerType: 'touch' });
+  tracker.add('touch');
+  assert.equal(tracker.value, 'touch');
+  tracker.add({ type: 'keydown' });
+  assert.equal(tracker.value, 'mixed');
+  const uncertain = trackInputs();
+  uncertain.add('touch');
+  uncertain.add('unknown');
+  assert.equal(uncertain.value, 'unknown');
+  uncertain.add('keyboard');
+  assert.equal(uncertain.value, 'mixed');
 });
 
 test('呼吸四阶段与周期边界清晰, 无呼后屏息时直接进入下一轮', () => {
