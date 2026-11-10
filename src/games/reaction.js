@@ -15,8 +15,8 @@ export const definition = {
       ] },
     ], validateSettings: (settings) => settings.minWait > settings.maxWait ? '最短等待不能大于最长等待.' : '', score: { unit: 'ms', lower: true, min: 0 }, hiddenPolicy: 'invalidate', inputs: ['pointer', 'touch', 'keyboard'], rule: '点击开始, 变绿后响应. 可连续测量并在完成时保存平均值.' },
     { id: 'single', name: '重复测量', ruleVersion: 2, presets: [{ id: 'default', name: '单次计时', settings: {} }], score: { unit: '秒', lower: true, min: 0 }, hiddenPolicy: 'invalidate', inputs: ['pointer', 'touch', 'keyboard'], rule: '点击开始, 等待绿色信号, 再尽快响应. 点击继续可再次测量.' },
-    { id: 'color', name: '颜色反应', ruleVersion: 2, presets: [{ id: 'five', name: '5 次', settings: {} }], score: { unit: 'ms', lower: true, min: 0 }, hiddenPolicy: 'invalidate', inputs: ['pointer', 'touch', 'keyboard'], rule: '等待颜色变绿后点击或按空格. 完成 5 次有效反应, 抢按后重新等待.' },
-    { id: 'start-lights', name: '起步灯', ruleVersion: 2, presets: [{ id: 'five', name: '连续 5 次', settings: {} }], score: { unit: '秒', lower: true, min: 0 }, hiddenPolicy: 'invalidate', inputs: ['pointer', 'touch', 'keyboard'], rule: '等待五盏灯依次亮起并熄灭, 然后点击或按空格. 抢跑将重新累计 5 次.' },
+    { id: 'color', name: '颜色反应', ruleVersion: 3, presets: [{ id: 'five', name: '5 次', settings: {} }], score: { unit: 'ms', lower: true, min: 0 }, hiddenPolicy: 'invalidate', inputs: ['pointer', 'touch', 'keyboard'], rule: '等待颜色变绿后点击或按空格. 完成 5 次有效反应, 抢按后重新等待.' },
+    { id: 'start-lights', name: '起步灯', ruleVersion: 3, presets: [{ id: 'five', name: '连续 5 次', settings: {} }], score: { unit: '秒', lower: true, min: 0, precision: 3 }, hiddenPolicy: 'invalidate', inputs: ['pointer', 'touch', 'keyboard'], rule: '等待五盏灯依次亮起并熄灭, 然后点击或按空格. 抢跑将重新累计 5 次.' },
   ],
 };
 
@@ -50,8 +50,8 @@ export function mount({ root, mode = definition.modes[0], preset = mode.presets[
     lights = 0;
     draw(lightMode ? '等待灯光熄灭' : '等待绿色出现');
     if (!lightMode) {
-      const min = staged ? (settings.minWait ?? preset.settings.minWait) * 1000 : 1200;
-      const max = staged ? (settings.maxWait ?? preset.settings.maxWait) * 1000 : 3400;
+      const min = staged ? (settings.minWait ?? preset.settings.minWait) * 1000 : mode.id === 'color' ? 2000 : 1200;
+      const max = staged ? (settings.maxWait ?? preset.settings.maxWait) * 1000 : mode.id === 'color' ? 6000 : 3400;
       timer = runtime.later(signal, min + random() * (max - min));
       return;
     }
@@ -64,19 +64,18 @@ export function mount({ root, mode = definition.modes[0], preset = mode.presets[
     timer = runtime.later(next, 1000);
   };
   const respond = (event, input) => {
-    if (phase === 'feedback') { if (continuous) begin(); return; }
+    if (phase === 'feedback') { begin(); return; }
     if (phase === 'idle') { begin(); return; }
     inputs.add(input);
     const at = inputTime(event, runtime.now);
     const responseMs = phase === 'ready' ? Math.max(0, at - shownAt) : null;
-    if (phase === 'waiting' || (lightMode && responseMs < 100)) {
+    if (phase === 'waiting' || ((lightMode || mode.id === 'color') && responseMs < 100)) {
       runtime.cancel(timer);
       early++;
       trials.push({ valid: false, reason: 'early', responseMs, input });
       if (lightMode) for (const trial of trials) trial.valid = false;
       phase = 'feedback';
-      draw('稍微早了一点', '准备重新等待');
-      if (!continuous) runtime.later(begin, 1000);
+      draw('稍微早了一点', '点击重新开始');
       return;
     }
     if (phase !== 'ready') return;
@@ -92,11 +91,10 @@ export function mount({ root, mode = definition.modes[0], preset = mode.presets[
       }
     }
     if (!continuous && valid().length === 5) {
-      runtime.finish({ value: Math.round((lightMode ? average / 1000 : average) * 1000) / 1000, detail: `${valid().length} 次有效反应的平均值, 抢按 ${early} 次`, mode: mode.id, preset: preset.id, settings, rules: mode.ruleVersion, input: inputs.value, endReason: 'completed', scored: true, metrics: { early, averageMs: average }, trials });
+      runtime.finish({ value: lightMode ? Math.round(average) / 1000 : Math.round(average), detail: `${valid().length} 次有效反应的平均值, 抢按 ${early} 次`, mode: mode.id, preset: preset.id, settings, rules: mode.ruleVersion, input: inputs.value, endReason: 'completed', scored: true, metrics: { early, averageMs: average }, trials });
       return;
     }
-    draw(single ? `${(responseMs / 1000).toFixed(3)} 秒` : `${Math.round(responseMs)} ms`, continuous ? '点击继续, 或完成并保存' : '准备下一次');
-    if (!continuous) runtime.later(begin, 900);
+    draw(single ? `${(responseMs / 1000).toFixed(3)} 秒` : `${Math.round(responseMs)} ms`, continuous ? '点击继续, 或完成并保存' : '点击继续');
   };
   runtime.listen(root, 'click', (event) => {
     if (event.target.closest('[data-reset]')) {
