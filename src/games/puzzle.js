@@ -1,21 +1,22 @@
 import { shuffle } from '../core.js';
 import { swapAdjacent } from '../engines/boards.js';
+import { inputTime } from '../engines/runtime.js';
 
 export const definition = {
   id: 'puzzle',
   modes: [{
     id: 'rows-columns', name: '行列拼图', ruleVersion: 2,
     presets: [
-      { id: '3x3', name: '3 × 3', settings: { rows: 3, cols: 3 } },
-      { id: '5x5', name: '5 × 5', settings: { rows: 5, cols: 5 } },
-      { id: '8x8', name: '8 × 8', settings: { rows: 8, cols: 8 } },
+      { id: '3x3', name: '3 × 3', settings: { rows: 3, cols: 3, image: 'default' } },
+      { id: '5x5', name: '5 × 5', settings: { rows: 5, cols: 5, image: 'default' } },
+      { id: '8x8', name: '8 × 8', settings: { rows: 8, cols: 8, image: 'default' } },
     ],
     fields: [
       { key: 'rows', label: '行数', type: 'number', default: 3, min: 3, max: 8, step: 1 },
       { key: 'cols', label: '列数', type: 'number', default: 3, min: 3, max: 8, step: 1 },
     ],
     score: { unit: '秒', lower: true, min: 0 }, hiddenPolicy: 'invalidate',
-    inputs: ['pointer'], rule: '左右拖动整列, 上下拖动整行, 将图片还原.'
+    inputs: ['pointer', 'touch', 'mixed'], rule: '左右拖动整列, 上下拖动整行, 将图片还原.'
   }]
 };
 
@@ -38,14 +39,15 @@ export function mount({ root, mode, preset, settings, onFinish, random = Math.ra
   let preview = false;
   let imageId = 'default';
   let loadVersion = 0;
+  const inputs = new Set();
   const cleanup = () => { active = false; controller.abort(); };
   const reset = () => {
     rowOrder = shuffle(Array.from({ length: rows }, (_, i) => i), random);
     colOrder = shuffle(Array.from({ length: cols }, (_, i) => i), random);
     if (rowOrder.every((value, index) => value === index) && colOrder.every((value, index) => value === index)) [colOrder[0], colOrder[1]] = [colOrder[1], colOrder[0]];
-    started = null; moves = 0; preview = false; draw();
+    started = null; moves = 0; preview = false; inputs.clear(); draw();
   };
-  root.innerHTML = '<div class="game-status"><span data-status></span><span data-error role="status"></span></div><canvas width="600" height="600" aria-label="拖动行列的图片拼图" style="display:block;max-width:100%;width:400px;margin:auto;touch-action:none"></canvas><div class="answer-options"><button class="answer-button" data-preview>按住预览原图</button><label class="answer-button">选择图片<input data-file type="file" accept="image/*"></label></div>';
+  root.innerHTML = '<div class="game-status"><span data-status></span><span data-error role="status"></span></div><canvas width="600" height="600" aria-label="拖动行列的图片拼图" style="display:block;max-width:100%;width:400px;margin:auto;touch-action:none"></canvas><div class="answer-options"><button type="button" class="answer-button" data-preview>按住预览原图</button><label class="answer-button" style="max-width:100%;min-width:0">选择图片<input data-file type="file" accept="image/*" style="max-width:100%;min-width:0"></label></div>';
   const canvas = root.querySelector('canvas');
   const context = canvas.getContext('2d');
   const draw = () => {
@@ -60,13 +62,13 @@ export function mount({ root, mode, preset, settings, onFinish, random = Math.ra
     root.querySelector('[data-status]').textContent = `交换 ${moves} 次`;
   };
   canvas.addEventListener('pointerdown', (event) => {
-    if (!active || preview) return;
+    if (!active || preview || gesture || event.button !== 0) return;
     const bounds = canvas.getBoundingClientRect();
-    gesture = { x: event.clientX, y: event.clientY, row: Math.min(rows - 1, Math.floor((event.clientY - bounds.top) / bounds.height * rows)), col: Math.min(cols - 1, Math.floor((event.clientX - bounds.left) / bounds.width * cols)), axis: null };
+    gesture = { x: event.clientX, y: event.clientY, row: Math.min(rows - 1, Math.floor((event.clientY - bounds.top) / bounds.height * rows)), col: Math.min(cols - 1, Math.floor((event.clientX - bounds.left) / bounds.width * cols)), axis: null, input: event.pointerType === 'touch' ? 'touch' : 'pointer', pointerId: event.pointerId };
     canvas.setPointerCapture(event.pointerId);
   }, { signal: controller.signal });
   canvas.addEventListener('pointermove', (event) => {
-    if (!gesture || !active) return;
+    if (!gesture || !active || event.pointerId !== gesture.pointerId) return;
     const bounds = canvas.getBoundingClientRect();
     const dx = event.clientX - gesture.x;
     const dy = event.clientY - gesture.y;
@@ -79,23 +81,25 @@ export function mount({ root, mode, preset, settings, onFinish, random = Math.ra
       const direction = Math.sign(delta);
       const next = swapAdjacent(axis === 'col' ? colOrder : rowOrder, gesture[axis], direction);
       if (!next) break;
-      if (started === null) started = clock.performance.now();
+      const at = inputTime(event, () => clock.performance.now());
+      if (started === null) started = at;
+      inputs.add(gesture.input);
       if (axis === 'col') { colOrder = next; gesture.col += direction; gesture.x += direction * threshold; delta = event.clientX - gesture.x; }
       else { rowOrder = next; gesture.row += direction; gesture.y += direction * threshold; delta = event.clientY - gesture.y; }
       moves++;
       draw();
       if (rowOrder.every((value, index) => value === index) && colOrder.every((value, index) => value === index)) {
-        const duration = (clock.performance.now() - started) / 1000;
+        const duration = Math.max(0, at - started) / 1000;
         cleanup();
-        onFinish({ value: duration, detail: `还原 ${rows} × ${cols}, 交换 ${moves} 次`, duration, mode: mode.id, preset: preset.id, settings: { ...settings, image: imageId }, rules: mode.ruleVersion, input: 'pointer', endReason: 'complete', scored: true, metrics: { moves }, trials: [] });
+        onFinish({ value: duration, detail: `还原 ${rows} × ${cols}, 交换 ${moves} 次`, duration, mode: mode.id, preset: preset.id, settings: { ...settings, image: imageId }, rules: mode.ruleVersion, input: inputs.size === 1 ? [...inputs][0] : 'mixed', endReason: 'complete', scored: true, metrics: { moves }, trials: [] });
         return;
       }
     }
   }, { signal: controller.signal });
-  canvas.addEventListener('pointerup', () => { gesture = null; }, { signal: controller.signal });
-  canvas.addEventListener('pointercancel', () => { gesture = null; }, { signal: controller.signal });
+  canvas.addEventListener('pointerup', (event) => { if (gesture?.pointerId === event.pointerId) gesture = null; }, { signal: controller.signal });
+  canvas.addEventListener('pointercancel', (event) => { if (gesture?.pointerId === event.pointerId) gesture = null; }, { signal: controller.signal });
   const previewButton = root.querySelector('[data-preview]');
-  previewButton.addEventListener('pointerdown', (event) => { preview = true; previewButton.setPointerCapture(event.pointerId); draw(); }, { signal: controller.signal });
+  previewButton.addEventListener('pointerdown', (event) => { if (event.button !== 0) return; preview = true; previewButton.setPointerCapture(event.pointerId); draw(); }, { signal: controller.signal });
   previewButton.addEventListener('pointerup', () => { preview = false; draw(); }, { signal: controller.signal });
   previewButton.addEventListener('pointercancel', () => { preview = false; draw(); }, { signal: controller.signal });
   root.querySelector('[data-file]').addEventListener('change', async (event) => {
