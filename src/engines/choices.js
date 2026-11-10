@@ -40,16 +40,17 @@ export function choiceTrial(kind, settings, random = Math.random, index = 0, pre
   if (kind === 'stroop') {
     const palette = (settings.palette === 'six' ? sixColors : colors).slice(0, settings.colors ?? 3);
     const ink = Math.floor(random() * palette.length);
-    const word = conflict ? pick(palette.map((_, i) => i).filter((i) => i !== ink), random) : ink;
+    const word = settings.independentColors ? Math.floor(random() * palette.length) : conflict ? pick(palette.map((_, i) => i).filter((i) => i !== ink), random) : ink;
     const variant = settings.variant ?? 'ink';
     const answer = variant === 'word' ? word : ink;
-    if (variant === 'match') return { stimulus: `<span style="color:${palette[ink].css}">${palette[word].name}</span>`, hint: '字义与颜色相同吗?', options: ['不同', '相同'], answer: Number(ink === word), group: conflict ? 'conflict' : 'congruent' };
+    if (variant === 'match') return { stimulus: `<span style="color:${palette[ink].css}">${palette[word].name}</span>`, hint: '字义与颜色相同吗?', options: ['不同', '相同'], answer: Number(ink === word), group: ink === word ? 'congruent' : 'conflict' };
     if (variant === 'two-lines') return { stimulus: `<span>${palette[word].name}</span><br><span style="color:${palette[ink].css}">■</span>`, hint: '上方字义与下方颜色相同吗?', options: ['不同', '相同'], answer: Number(ink === word), group: conflict ? 'conflict' : 'congruent' };
-    return { stimulus: `<span style="color:${palette[ink].css}">${palette[word].name}</span>`, hint: variant === 'word' ? '选择字义' : '选择文字的颜色', options: palette.map((color) => `${color.name}色`), answer, group: conflict ? 'conflict' : 'congruent' };
+    return { stimulus: `<span style="color:${palette[ink].css}">${palette[word].name}</span>`, hint: variant === 'word' ? '选择字义' : '选择文字的颜色', options: palette.map((color) => `${color.name}色`), answer, group: ink === word ? 'congruent' : 'conflict' };
   }
   if (kind === 'number-comparison') {
     const a = Math.floor(random() * 90) + 10;
-    const candidates = Array.from({ length: 90 }, (_, i) => i + 10).filter((value) => Math.abs(value - a) >= 2);
+    const difference = (settings.level ?? 1) > 1 ? 1 : 2;
+    const candidates = Array.from({ length: 90 }, (_, i) => i + 10).filter((value) => Math.abs(value - a) >= difference);
     const b = pick(candidates, random);
     return { stimulus: '选择较大的数字', options: [String(a), String(b)], answer: a > b ? 0 : 1, group: 'comparison' };
   }
@@ -66,6 +67,13 @@ export function choiceTrial(kind, settings, random = Math.random, index = 0, pre
 export function flankerSchedule(random = Math.random) {
   const balanced = (group, count) => Array.from({ length: count }, (_, i) => ({ group, direction: i % 2 }));
   return [...shuffle([...balanced('congruent', 2), ...balanced('conflict', 2)], random), ...shuffle([...balanced('congruent', 16), ...balanced('conflict', 16), ...balanced('neutral', 8)], random)];
+}
+
+export function numberChallenge(level, attempts, correct) {
+  const targetAttempts = 25 + (level - 1) * 3;
+  const targetAccuracy = level === 1 ? 90 : Math.round((targetAttempts - 2) / targetAttempts * 100);
+  const accuracy = attempts ? correct / attempts * 100 : 0;
+  return { level, targetAttempts, targetAccuracy, accuracy, achieved: attempts >= targetAttempts && accuracy >= targetAccuracy };
 }
 
 export function choiceMetrics(trials) {
@@ -102,13 +110,11 @@ export function mountChoices({ root, mode, preset, settings, onFinish, random = 
     const groupPair = kind === 'posner-cue' ? ['invalid', 'valid'] : kind === 'task-switching' ? ['switch', 'repeat'] : ['conflict', 'congruent'];
     const [first, second] = groupPair.map((key) => metrics.groups[key]?.meanMs);
     metrics.effectMs = Number.isFinite(first) && Number.isFinite(second) ? first - second : null;
-    if (kind === 'number-comparison') {
-      metrics.accuracy = scoredTrials.length ? metrics.correct / scoredTrials.length * 100 : 0;
-      metrics.targetAttempts = 25;
-      metrics.challenge = scoredTrials.length >= 25 && metrics.accuracy >= 90 ? '达标' : '未达标';
-    }
+    const challenge = kind === 'number-comparison' ? numberChallenge(values.level ?? 1, scoredTrials.length, metrics.correct) : null;
+    if (challenge) Object.assign(metrics, challenge, { challenge: challenge.achieved ? '达标' : '未达标' });
     const score = kind === 'number-comparison' ? metrics.correct : kind === 'posner-cue' ? metrics.meanMs : values.penalty ? (metrics.meanMs === null ? null : Math.round(metrics.meanMs + metrics.errors * values.penalty) / 1000) : scoredTrials.length ? Math.round(metrics.correct / scoredTrials.length * 100) : null;
-    const unlocks = kind === 'stroop' && mode.id === 'ink' && scoredTrials.length && metrics.correct / scoredTrials.length >= 0.9 ? ['stroop|ink|reverse'] : [];
+    const accuracy = scoredTrials.length ? metrics.correct / scoredTrials.length : 0;
+    const unlocks = challenge?.achieved ? [`number-comparison|level|${challenge.level + 1}`] : kind === 'stroop' && mode.id === 'ink' && preset.id === '3' && accuracy >= 0.85 ? ['stroop|ink|4'] : kind === 'stroop' && mode.id === 'ink' && preset.id === '4' && accuracy >= 0.9 ? ['stroop|ink|5', 'stroop|ink|reverse'] : [];
     runtime.finish({ value: score, detail: `${scoredTrials.length} 题中答对 ${metrics.correct} 题`, mode: mode.id, preset: preset.id, settings: values, rules: mode.ruleVersion, input: inputs.value, endReason: values.duration ? 'timeout' : 'completed', scored: score !== null, metrics, trials, unlocks });
   };
   const advance = () => {
