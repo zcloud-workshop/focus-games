@@ -1,22 +1,23 @@
 import { createRuntime } from '../engines/runtime.js';
+import { isUnlocked } from '../storage.js';
 
 export const definition = {
   id: 'breath',
   modes: [{
-    id: 'staged', name: '循序呼吸', ruleVersion: 2,
+    id: 'staged', name: '循序呼吸', ruleVersion: 3,
     presets: [
       { id: 'beginner', name: '初级 4 / 4 / 4', settings: { inhale: 4, holdIn: 4, exhale: 4, holdOut: 0 } },
       { id: 'intermediate', name: '中级 4 / 7 / 8', settings: { inhale: 4, holdIn: 7, exhale: 8, holdOut: 0 }, unlock: { key: 'breath|staged|intermediate', requires: ['breath|staged|intermediate'] } },
       { id: 'advanced', name: '高级 5 / 10 / 10', settings: { inhale: 5, holdIn: 10, exhale: 10, holdOut: 0 }, unlock: { key: 'breath|staged|advanced', requires: ['breath|staged|advanced'] } },
       { id: 'box', name: '箱式 4 / 4 / 4 / 4', settings: { inhale: 4, holdIn: 4, exhale: 4, holdOut: 4 }, unlock: { key: 'breath|staged|box', requires: ['breath|staged|box'] } },
       { id: 'custom', name: '自定义', settings: { inhale: 4, holdIn: 4, exhale: 4, holdOut: 0 }, unlock: { key: 'breath|staged|intermediate', requires: ['breath|staged|intermediate'] }, fields: [
-        { key: 'inhale', label: '吸气', type: 'number', default: 4, min: 1, max: 30, step: 1, unit: '秒' },
-        { key: 'holdIn', label: '屏息', type: 'number', default: 4, min: 0, max: 30, step: 1, unit: '秒' },
-        { key: 'exhale', label: '呼气', type: 'number', default: 4, min: 1, max: 30, step: 1, unit: '秒' },
+        { key: 'inhale', label: '吸气', type: 'number', default: 4, min: 2, max: 4, step: 1, unit: '秒', maxByUnlock: [{ key: 'breath|staged|intermediate', max: 6 }, { key: 'breath|staged|advanced', max: 8 }] },
+        { key: 'holdIn', label: '屏息', type: 'number', default: 4, min: 0, max: 4, step: 1, unit: '秒', maxByUnlock: [{ key: 'breath|staged|intermediate', max: 10 }, { key: 'breath|staged|advanced', max: 15 }] },
+        { key: 'exhale', label: '呼气', type: 'number', default: 4, min: 2, max: 8, step: 1, unit: '秒', maxByUnlock: [{ key: 'breath|staged|intermediate', max: 10 }, { key: 'breath|staged|advanced', max: 15 }] },
       ] },
     ],
     score: { unit: '轮', lower: false, min: 0 }, hiddenPolicy: 'invalidate', inputs: ['unknown'],
-    rule: '跟随引导完成 3 轮. 如感到不适, 请随时停止.',
+    rule: '跟随引导呼吸, 完成 3 轮可解锁下一档. 如感到不适, 请随时停止.',
   }, {
     id: 'guided', name: '定时呼吸', ruleVersion: 3,
     presets: [
@@ -55,19 +56,20 @@ export function breathUnlock(preset, cycles) {
   return next.map((id) => `breath|staged|${id}`);
 }
 
-export function mount({ root, mode = definition.modes[0], preset = mode.presets[0], settings = preset.settings, onFinish, clock = globalThis }) {
+export function mount({ root, mode = definition.modes[0], preset = mode.presets[0], settings = preset.settings, onFinish, clock = globalThis, store }) {
   const runtime = createRuntime({ onFinish, clock });
   const values = { ...preset.settings, ...settings };
   const staged = mode.id === 'staged';
   const cycle = values.inhale + values.holdIn + values.exhale + values.holdOut;
-  const goal = staged ? cycle * 3 : values.minutes * 60;
+  const goal = staged ? Infinity : values.minutes * 60;
   let started = runtime.now();
   let pausedAt = null;
   let pauseTime = 0;
   let segmentStart = 0;
   let completedCycles = 0;
-  root.innerHTML = '<div class="game-status"><span>舒适呼吸</span><span id="breath-round"></span></div><div class="breath-orbit"><div class="breath-circle"><strong id="breath-label"></strong><span id="breath-count"></span></div></div><p class="stage-note">不必刻意深呼吸, 保持自然舒适即可</p><div class="result-actions"><button class="button secondary" data-breath="pause">暂停</button><button class="button secondary" data-breath="reset">重新开始</button></div>';
+  root.innerHTML = `<div class="game-status"><span>舒适呼吸</span><span id="breath-round"></span></div><div class="breath-orbit"><div class="breath-circle"><strong id="breath-label"></strong><span id="breath-count"></span></div></div><p class="stage-note">不必刻意深呼吸, 保持自然舒适即可</p><div class="result-actions"><button class="button secondary" data-breath="pause">暂停</button><button class="button secondary" data-breath="reset">重新开始</button>${staged ? '<button class="button primary" data-breath="finish">结束</button>' : ''}</div>`;
   const circle = root.querySelector('.breath-circle');
+  const complete = (elapsed, cycles, unlocks = []) => runtime.finish({ value: cycles, detail: `完成 ${cycles} 个完整呼吸周期`, duration: elapsed, mode: mode.id, preset: preset.id, settings: values, rules: mode.ruleVersion, input: 'unknown', endReason: 'completed', scored: true, metrics: { activeSeconds: elapsed }, unlocks });
   const render = () => {
     if (!runtime.active) return;
     const elapsed = Math.min(goal, ((pausedAt ?? runtime.now()) - started - pauseTime) / 1000);
@@ -78,14 +80,20 @@ export function mount({ root, mode = definition.modes[0], preset = mode.presets[
     root.querySelector('#breath-count').textContent = Math.ceil(phase.remaining);
     const scale = phase.label === '吸气' ? 1 + phase.progress * 0.35 : phase.label === '呼气' ? 1.35 - phase.progress * 0.35 : (values.holdOut && (elapsed - segmentStart) % cycle >= values.inhale + values.holdIn + values.exhale ? 1 : 1.35);
     circle.style.transform = `scale(${scale})`;
-    if (elapsed >= goal) {
-      runtime.finish({ value: cycles, detail: `完成 ${cycles} 个完整呼吸周期`, duration: elapsed, mode: mode.id, preset: preset.id, settings: values, rules: mode.ruleVersion, input: 'unknown', endReason: 'completed', scored: true, metrics: { activeSeconds: elapsed }, unlocks: staged ? breathUnlock(preset.id, cycles) : [] });
+    const saved = store?.data;
+    const unlocks = staged ? breathUnlock(preset.id, cycles).filter((key) => !saved || !isUnlocked(saved, key)) : [];
+    if (elapsed >= goal || unlocks.length) {
+      complete(elapsed, cycles, unlocks);
       return;
     }
     runtime.frame(render);
   };
   runtime.listen(root, 'click', (event) => {
     const action = event.target.closest('[data-breath]')?.dataset.breath;
+    if (action === 'finish') {
+      const elapsed = ((pausedAt ?? runtime.now()) - started - pauseTime) / 1000;
+      complete(elapsed, completedCycles + breathPhase(elapsed - segmentStart, values).cycles);
+    }
     if (action === 'pause') {
       if (pausedAt === null) { pausedAt = runtime.now(); event.target.textContent = '继续'; }
       else {
