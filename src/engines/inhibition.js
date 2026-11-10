@@ -1,4 +1,4 @@
-import { createRuntime, inputTime } from './runtime.js';
+import { createRuntime, inputMethod, inputTime, trackInputs } from './runtime.js';
 import { presentOnFrame } from './trials.js';
 import { shuffle } from '../core.js';
 
@@ -21,7 +21,7 @@ export function mountInhibition({ root, mode, preset, settings, onFinish, random
   const trials = [];
   const stopCount = Math.round(values.count * values.stopRate / 100);
   const schedule = shuffle([...Array(stopCount).fill(true), ...Array(values.count - stopCount).fill(false)], random);
-  const inputs = new Set();
+  const inputs = trackInputs();
   let current;
   let shownAt;
   let accepted = false;
@@ -31,7 +31,7 @@ export function mountInhibition({ root, mode, preset, settings, onFinish, random
       const metrics = inhibitionSummary(trials);
       const correct = metrics.goCorrect + metrics.stopCorrect;
       const value = kind === 'sart' ? correct / trials.length : metrics.stopCorrect / metrics.stopTotal;
-      runtime.finish({ value: Math.round(value * 100), detail: `${trials.length} 次中正确 ${correct} 次`, mode: mode.id, preset: preset.id, settings: values, rules: mode.ruleVersion, input: inputs.size === 1 ? [...inputs][0] : inputs.size ? 'mixed' : 'any', endReason: 'completed', scored: true, metrics, trials });
+      runtime.finish({ value: Math.round(value * 100), detail: `${trials.length} 次中正确 ${correct} 次`, mode: mode.id, preset: preset.id, settings: values, rules: mode.ruleVersion, input: inputs.value, endReason: 'completed', scored: true, metrics, trials });
       return;
     }
     waiting = true;
@@ -70,14 +70,14 @@ export function mountInhibition({ root, mode, preset, settings, onFinish, random
     const button = event.target.closest('[data-answer]');
     if (!button || event.button !== 0) return;
     event.preventDefault();
-    answer(button.dataset.answer, event, event.pointerType === 'touch' ? 'touch' : 'pointer');
+    answer(button.dataset.answer, event, inputMethod(event));
   });
   runtime.listen(document, 'keydown', (event) => {
     if (event.repeat || event.ctrlKey || event.metaKey || event.altKey) return;
     const value = kind === 'stop-signal' ? ({ ArrowLeft: 'left', ArrowRight: 'right' })[event.code] : event.code === 'Space' ? 'press' : null;
     if (!value) return;
     event.preventDefault();
-    answer(value, event, 'keyboard');
+    answer(value, event, inputMethod(event));
   });
   next();
   return runtime.cleanup;
