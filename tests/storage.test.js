@@ -43,7 +43,8 @@ function legacyTab(storage) {
   };
 }
 
-const v1Record = (game, value, level = 0, at = new Date(2026, 10, 10, 12)) => ({ game, value, level, duration: 30, at: at.toISOString() });
+const utc = (hour, minute = 0) => new Date(Date.UTC(2026, 10, 10, hour, minute));
+const v1Record = (game, value, level = 0, at = utc(4)) => ({ game, value, level, duration: 30, at: at.toISOString() });
 let clock = Date.UTC(2026, 10, 10, 6);
 function classicRecord(game, value, extra = {}) {
   const config = games.find((item) => item.id === game);
@@ -58,7 +59,7 @@ function save(game, value, extra) {
 }
 
 test('首次读取从 v1 迁移记录和收藏, v1 保持原样', () => {
-  const v1 = { records: [v1Record('schulte', 10), v1Record('schulte', 8, 0, new Date(2026, 10, 10, 13)), v1Record('stroop', 95, 1, new Date(2026, 10, 10, 14))], favorites: ['schulte', 'stroop'] };
+  const v1 = { records: [v1Record('schulte', 10), v1Record('schulte', 8, 0, utc(5)), v1Record('stroop', 95, 1, utc(6))], favorites: ['schulte', 'stroop'] };
   const storage = memoryStorage({ [LEGACY_KEY]: v1 });
   const before = storage.getItem(LEGACY_KEY);
   const store = createStore(() => storage);
@@ -105,7 +106,7 @@ test('旧版本标签页写入 v1 后去重合并, 新数据不丢失', () => {
   assert.deepEqual(stored(storage).favorites, ['math', 'nback']);
 
   oldTab.reload();
-  oldTab.finish(v1Record('color', 80, 0, new Date(2026, 10, 10, 16)));
+  oldTab.finish(v1Record('color', 80, 0, utc(8)));
   assert.equal(stored(storage).records.length, 3, '旧版本标签页不会修改 v2');
   assert.equal(store.load().records.length, 4);
   assert.equal(bestFor(store.data, classicBestKey('color', 0)).value, 80);
