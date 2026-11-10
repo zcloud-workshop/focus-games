@@ -1,10 +1,12 @@
 import './style.css';
-import { games, categories, dailyGames, localDate, summarize, bestRecord, readSaved } from './core.js';
+import { games, categories, dailyGames, localDate, summarize } from './core.js';
+import { STORAGE_KEY, LEGACY_KEY, CLASSIC_MODE, CLASSIC_RULES, createStore, createId, addRecord, setFavorite, classicBestKey, bestFor, visibleRecords, exportData } from './storage.js';
 import { icon } from './icons.js';
 import { mountGame } from './games.js';
 
 const app = document.querySelector('#app');
-let saved = readSaved();
+const store = createStore();
+let saved = store.load({ persist: true });
 let view = 'training';
 let category = 'all';
 let search = '';
@@ -37,10 +39,14 @@ function toast(message) {
   toastTimer = setTimeout(() => element.classList.remove('visible'), 3200);
 }
 
-function persist() {
-  try { window.localStorage.setItem('focus-lab-v1', JSON.stringify(saved)); }
-  catch { toast('本机存储不可用, 当前成绩仅在本次打开期间保留.'); }
+function update(operation) {
+  const outcome = store.mutate(operation);
+  saved = store.data;
+  if (!outcome.ok) toast('本机存储不可用, 当前成绩仅在本次打开期间保留.');
+  return outcome;
 }
+
+const favoriteIds = () => saved.favorites.filter((id) => games.some((game) => game.id === id));
 
 const formatValue = (value, unit) => `${Number.isInteger(value) ? value : value.toFixed(2)} <small>${unit}</small>`;
 const escapeHtml = (text) => text.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
@@ -50,7 +56,7 @@ function navigation() {
     <a class="brand" href="#training" aria-label="Focus Lab 首页">${icon('focus')}<span>Focus Lab</span></a>
     <nav aria-label="主导航">
       <a class="nav-link ${view === 'training' ? 'active' : ''}" href="#training" ${view === 'training' ? 'aria-current="page"' : ''}>训练</a>
-      <a class="nav-link ${view === 'favorites' ? 'active' : ''}" href="#favorites" ${view === 'favorites' ? 'aria-current="page"' : ''}>收藏<span class="nav-count">${saved.favorites.length || ''}</span></a>
+      <a class="nav-link ${view === 'favorites' ? 'active' : ''}" href="#favorites" ${view === 'favorites' ? 'aria-current="page"' : ''}>收藏<span class="nav-count">${favoriteIds().length || ''}</span></a>
       <a class="nav-link ${view === 'records' ? 'active' : ''}" href="#records" ${view === 'records' ? 'aria-current="page"' : ''}>记录</a>
     </nav>
     <button class="theme-toggle" data-action="theme" aria-label="${theme === 'dark' ? '切换明亮主题' : '切换深色主题'}" title="${theme === 'dark' ? '明亮' : '深色'}">${icon(theme === 'dark' ? 'sun' : 'moon')}</button>
@@ -86,18 +92,18 @@ function filteredGames() {
 }
 
 function trainingContent() {
-  return `${view === 'training' ? hero() : ''}<section class="training-section" id="training-list" aria-labelledby="training-title"><div class="section-heading"><h2 id="training-title">${view === 'favorites' ? '收藏' : '训练'}<span id="game-count">${filteredGames().length}</span></h2></div><div class="training-toolbar"><div class="filter-tabs" role="group" aria-label="训练分类">${categories.map((item) => `<button class="filter-tab ${category === item.id ? 'active' : ''}" data-action="filter" data-category="${item.id}" aria-pressed="${category === item.id}">${item.name}${item.id === 'all' ? `<span class="filter-count">${view === 'favorites' ? saved.favorites.length : games.length}</span>` : ''}</button>`).join('')}</div><label class="search-field">${icon('search')}<input id="game-search" type="search" placeholder="搜索" aria-label="搜索训练" value="${escapeHtml(search)}"></label></div><div class="game-grid" id="game-grid">${cardsContent()}</div></section>`;
+  return `${view === 'training' ? hero() : ''}<section class="training-section" id="training-list" aria-labelledby="training-title"><div class="section-heading"><h2 id="training-title">${view === 'favorites' ? '收藏' : '训练'}<span id="game-count">${filteredGames().length}</span></h2></div><div class="training-toolbar"><div class="filter-tabs" role="group" aria-label="训练分类">${categories.map((item) => `<button class="filter-tab ${category === item.id ? 'active' : ''}" data-action="filter" data-category="${item.id}" aria-pressed="${category === item.id}">${item.name}${item.id === 'all' ? `<span class="filter-count">${view === 'favorites' ? favoriteIds().length : games.length}</span>` : ''}</button>`).join('')}</div><label class="search-field">${icon('search')}<input id="game-search" type="search" placeholder="搜索" aria-label="搜索训练" value="${escapeHtml(search)}"></label></div><div class="game-grid" id="game-grid">${cardsContent()}</div></section>`;
 }
 
 function cardsContent() {
   const items = filteredGames();
-  return items.length ? items.map(card).join('') : `<div class="empty-state">${icon(view === 'favorites' ? 'star' : 'search')}<h3>${view === 'favorites' && !saved.favorites.length ? '暂无收藏.' : '未找到训练.'}</h3><button class="button secondary" data-action="reset-search">全部训练</button></div>`;
+  return items.length ? items.map(card).join('') : `<div class="empty-state">${icon(view === 'favorites' ? 'star' : 'search')}<h3>${view === 'favorites' && !favoriteIds().length ? '暂无收藏.' : '未找到训练.'}</h3><button class="button secondary" data-action="reset-search">全部训练</button></div>`;
 }
 
 function recordsContent(stats) {
   const max = Math.max(3, ...stats.week.map((day) => day.count));
-  const records = [...saved.records].reverse();
-  return `<section class="records-summary"><div class="summary-tile"><span>训练</span><b>${records.length}<small> 次</small></b></div><div class="summary-tile"><span>时间</span><b>${Math.floor(records.reduce((sum, r) => sum + r.duration, 0) / 60)}<small> 分钟</small></b></div><div class="summary-tile"><span>连续</span><b>${stats.streak}<small> 天</small></b></div></section><section class="week-panel"><h2>近 7 天</h2><div class="week-chart">${stats.week.map((day) => `<div class="week-day" title="${day.date}: ${day.count} 次"><span class="week-value">${day.count}</span><div class="week-bar-track"><div class="week-bar ${day.date === localDate() ? 'today' : ''}" style="height:${Math.max(day.count / max * 100, 3)}%"></div></div><span>${day.date === localDate() ? '今天' : `周${day.label}`}</span></div>`).join('')}</div></section><section class="history-section"><div class="section-heading"><h2>历史 <span>${records.length}</span></h2><button class="text-button" data-action="export" ${records.length ? '' : 'disabled'}>导出 ${icon('download')}</button></div>${records.length ? `<div class="table-wrap"><table><thead><tr><th>训练</th><th>难度</th><th>成绩</th><th>用时</th><th>日期</th></tr></thead><tbody>${records.map((record) => { const game = games.find((item) => item.id === record.game); return `<tr><td>${game.name}</td><td>${game.levels[record.level]}</td><td class="record-score">${formatValue(record.value, game.unit)}</td><td>${Math.round(record.duration)} 秒</td><td>${new Date(record.at).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })}</td></tr>`; }).join('')}</tbody></table></div>` : `<div class="empty-state">${icon('chart')}<h3>暂无记录.</h3><a class="button primary" href="#training">开始训练</a></div>`}<p class="storage-note">仅存于此设备, 保留最近 500 条.</p></section>`;
+  const records = visibleRecords(saved.records).reverse().sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
+  return `<section class="records-summary"><div class="summary-tile"><span>训练</span><b>${records.length}<small> 次</small></b></div><div class="summary-tile"><span>时间</span><b>${Math.floor(records.reduce((sum, r) => sum + r.duration, 0) / 60)}<small> 分钟</small></b></div><div class="summary-tile"><span>连续</span><b>${stats.streak}<small> 天</small></b></div></section><section class="week-panel"><h2>近 7 天</h2><div class="week-chart">${stats.week.map((day) => `<div class="week-day" title="${day.date}: ${day.count} 次"><span class="week-value">${day.count}</span><div class="week-bar-track"><div class="week-bar ${day.date === localDate() ? 'today' : ''}" style="height:${Math.max(day.count / max * 100, 3)}%"></div></div><span>${day.date === localDate() ? '今天' : `周${day.label}`}</span></div>`).join('')}</div></section><section class="history-section"><div class="section-heading"><h2>历史 <span>${records.length}</span></h2><button class="text-button" data-action="export" ${records.length ? '' : 'disabled'}>导出 ${icon('download')}</button></div>${records.length ? `<div class="table-wrap"><table><thead><tr><th>训练</th><th>难度</th><th>成绩</th><th>用时</th><th>日期</th></tr></thead><tbody>${records.map((record) => { const game = games.find((item) => item.id === record.game); return `<tr><td>${game.name}</td><td>${escapeHtml(String(record.label ?? game.levels[record.level]))}</td><td class="record-score">${formatValue(record.value, escapeHtml(String(record.unit ?? game.unit)))}</td><td>${Math.round(record.duration)} 秒</td><td>${new Date(record.at).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })}</td></tr>`; }).join('')}</tbody></table></div>` : `<div class="empty-state">${icon('chart')}<h3>暂无记录.</h3><a class="button primary" href="#training">开始训练</a></div>`}<p class="storage-note">仅存于此设备, 保留最近 500 条. 个人最佳长期保留.</p></section>`;
 }
 
 function guideContent() {
@@ -115,7 +121,7 @@ function render() {
   const route = location.hash.slice(1) || 'training';
   const isGame = route.startsWith('game/');
   if (!isGame) view = ['training', 'favorites', 'records', 'guide'].includes(route) ? route : 'training';
-  const stats = summarize(saved.records);
+  const stats = summarize(visibleRecords(saved.records));
   const heading = { training: '训练', favorites: '收藏', records: '记录', guide: '关于' }[view];
   app.innerHTML = `${navigation()}<main id="main-content">${view === 'records' || view === 'guide' ? `<div class="page-heading"><h1>${heading}.</h1></div>` : ''}${view === 'records' ? recordsContent(stats) : view === 'guide' ? guideContent() : trainingContent()}<footer class="footer"><span>© 2026 Zcloud Workshop</span><a href="https://github.com/zcloud-workshop/focus-games" target="_blank" rel="noopener noreferrer">GitHub</a><a href="#guide">关于 ${icon('chevron')}</a></footer></main><dialog id="game-dialog" aria-labelledby="dialog-title"><div id="dialog-content"></div></dialog>`;
   document.querySelector('#game-search')?.addEventListener('input', (event) => { search = event.target.value; updateCards(); });
@@ -157,7 +163,7 @@ function openGame(game) {
 }
 
 function bestText(game) {
-  const best = bestRecord(saved.records, game.id, level);
+  const best = bestFor(saved, classicBestKey(game.id, level));
   return best ? `最佳 <b>${formatValue(best.value, game.unit)}</b>` : '暂无记录';
 }
 
@@ -181,14 +187,15 @@ function start(game) {
 
 function showResult(game, result) {
   running = false;
-  const oldBest = bestRecord(saved.records, game.id, level);
-  const isBest = !oldBest || (game.lower ? result.value < oldBest.value : result.value > oldBest.value);
-  saved.records.push({ game: game.id, level, value: result.value, duration: result.duration, at: new Date().toISOString() });
-  saved.records = saved.records.slice(-500);
-  persist();
+  if (!Number.isFinite(result.value)) {
+    document.querySelector('#dialog-content').innerHTML = dialogHeader(game) + `<div class="empty-state">${icon('info')}<h3>没有有效结果.</h3><p>本轮未保存.</p><button class="button primary" data-action="retry" data-id="${game.id}">重新开始 ${icon('arrow')}</button></div>`;
+    return;
+  }
+  const record = { id: createId(), game: game.id, mode: CLASSIC_MODE, rules: CLASSIC_RULES, level, label: game.levels[level], value: result.value, unit: game.unit, duration: result.duration, at: new Date().toISOString() };
+  const { ok, result: { isBest, previous } } = update((data) => addRecord(data, record, { key: classicBestKey(game.id, level), lower: game.lower }));
   const hasNext = dailySession && dailySession.index < dailyGames.length - 1;
   const challengeDone = dailySession && !hasNext;
-  document.querySelector('#dialog-content').innerHTML = dialogHeader(game) + `<div class="result-content"><span class="result-check">${icon('check')}</span><h3>${challengeDone ? '挑战完成.' : '完成.'}</h3><p>${result.detail}</p><div class="result-value">${formatValue(result.value, game.unit)}</div><span class="result-badge">${isBest ? '新纪录' : `最佳 ${oldBest.value} ${game.unit}`}</span><div class="result-details"><span>用时 <b>${Math.round(result.duration)} 秒</b></span><span>难度 <b>${game.levels[level]}</b></span></div><p class="saved-message">${icon('check')}已保存</p><div class="result-actions">${hasNext ? '<button class="button primary" data-action="next-daily">下一项 '+icon('arrow')+'</button>' : `<button class="button primary" data-action="retry" data-id="${game.id}">再来一次 ${icon('arrow')}</button>`}<button class="button secondary" data-action="close">返回</button></div></div>`;
+  document.querySelector('#dialog-content').innerHTML = dialogHeader(game) + `<div class="result-content"><span class="result-check">${icon('check')}</span><h3>${challengeDone ? '挑战完成.' : '完成.'}</h3><p>${result.detail}</p><div class="result-value">${formatValue(result.value, game.unit)}</div><span class="result-badge">${isBest ? '新纪录' : `最佳 ${previous.value} ${game.unit}`}</span><div class="result-details"><span>用时 <b>${Math.round(result.duration)} 秒</b></span><span>难度 <b>${game.levels[level]}</b></span></div><p class="saved-message">${ok ? `${icon('check')}已保存` : `${icon('info')}仅本次保留`}</p><div class="result-actions">${hasNext ? '<button class="button primary" data-action="next-daily">下一项 '+icon('arrow')+'</button>' : `<button class="button primary" data-action="retry" data-id="${game.id}">再来一次 ${icon('arrow')}</button>`}<button class="button secondary" data-action="close">返回</button></div></div>`;
   document.querySelector('.result-actions button').focus();
 }
 
@@ -199,12 +206,12 @@ document.addEventListener('click', (event) => {
   if (action === 'filter') { category = button.dataset.category; updateCards(); }
   if (action === 'favorite') {
     const id = button.dataset.id;
-    saved.favorites = saved.favorites.includes(id) ? saved.favorites.filter((item) => item !== id) : [...saved.favorites, id];
-    persist();
+    const favorite = button.getAttribute('aria-pressed') !== 'true';
+    update((data) => setFavorite(data, id, favorite));
     updateCards();
-    document.querySelector('.nav-count').textContent = saved.favorites.length || '';
+    document.querySelector('.nav-count').textContent = favoriteIds().length || '';
     document.querySelector('.favorite-button[data-id="'+id+'"]')?.focus({ preventScroll: true });
-    if (view === 'favorites') document.querySelector('.filter-tab[data-category="all"] span').textContent = saved.favorites.length;
+    if (view === 'favorites') document.querySelector('.filter-tab[data-category="all"] span').textContent = favoriteIds().length;
   }
   if (action === 'theme') {
     theme = theme === 'light' ? 'dark' : 'light';
@@ -231,7 +238,7 @@ document.addEventListener('click', (event) => {
   if (action === 'start') start(games.find((game) => game.id === button.dataset.id));
   if (action === 'retry') { dailySession = null; openGame(games.find((game) => game.id === button.dataset.id)); }
   if (action === 'export') {
-    const blob = new Blob([JSON.stringify({ exportedAt: new Date().toISOString(), records: saved.records }, null, 2)], { type: 'application/json' });
+    const blob = new Blob([JSON.stringify(exportData(saved), null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
@@ -263,8 +270,8 @@ window.addEventListener('storage', (event) => {
     applyTheme();
     return;
   }
-  if (event.key !== 'focus-lab-v1' || running) return;
-  saved = readSaved();
+  if (event.key !== null && event.key !== STORAGE_KEY && event.key !== LEGACY_KEY) return;
+  saved = store.load();
   if (!location.hash.startsWith('#game/')) render();
 });
 applyTheme();
