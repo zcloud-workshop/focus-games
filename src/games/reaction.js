@@ -20,6 +20,11 @@ export const definition = {
   ],
 };
 
+export function reactionUnlock(preset, responseMs) {
+  const next = preset === 'beginner' && responseMs < 300 ? 'intermediate' : preset === 'intermediate' && responseMs < 250 ? 'advanced' : null;
+  return next ? `reaction|staged|${next}` : null;
+}
+
 export function mount({ root, mode = definition.modes[0], preset = mode.presets[0], settings = {}, onFinish, random = Math.random, clock = globalThis, store }) {
   const runtime = createRuntime({ onFinish, clock });
   const trials = [];
@@ -83,9 +88,8 @@ export function mount({ root, mode = definition.modes[0], preset = mode.presets[
     phase = 'feedback';
     const average = meanValidResponses(trials);
     if (staged) {
-      const next = preset.id === 'beginner' && responseMs <= 300 ? 'intermediate' : preset.id === 'intermediate' && responseMs <= 250 ? 'advanced' : null;
-      if (next) {
-        const key = `reaction|staged|${next}`;
+      const key = reactionUnlock(preset.id, responseMs);
+      if (key) {
         unlocks.add(key);
         store?.mutate((data) => markUnlocked(data, key));
       }
