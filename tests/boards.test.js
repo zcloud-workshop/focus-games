@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { addMergeTile, canMergeMove, createLights, createMaze, createSliding, mergeLine, moveMaze, moveMerge, moveSliding, slidingNeighbors, solveLights, solvedSliding, toggleLights } from '../src/engines/boards.js';
+import { addMergeTile, canMergeMove, createLights, createMaze, createSliding, matchingPositions, mergeLine, moveMaze, moveMerge, moveSliding, slidingNeighbors, solveLights, solvedSliding, toggleLights } from '../src/engines/boards.js';
 
 test('数字合并一回合中每个方块最多参与一次合并', () => {
   assert.deepEqual(mergeLine([2, 2, 2, 2]), { line: [4, 4, 0, 0], score: 8 });
@@ -8,6 +8,11 @@ test('数字合并一回合中每个方块最多参与一次合并', () => {
   const board = [2, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
   assert.deepEqual(moveMerge(board, 'right').board.slice(0, 4), [0, 0, 4, 4]);
   assert.deepEqual(board.slice(0, 4), [2, 2, 2, 2]);
+});
+
+test('瓶色反馈只计算对应位置, 包含重复颜色', () => {
+  assert.equal(matchingPositions([1, 2, 1, 3], [1, 1, 2, 3]), 2);
+  assert.equal(matchingPositions([1, 2], [2, 1]), 0);
 });
 
 test('生成迷宫始终可从起点到达终点, 墙体阻止移动', () => {
