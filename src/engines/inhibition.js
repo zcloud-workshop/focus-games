@@ -21,6 +21,8 @@ export function inhibitionUnlock(kind, preset, metrics) {
   if (kind === 'gonogo' && preset.id === 'standard' && percent >= 90) return ['gonogo|signals|fast'];
   if (kind === 'stop-signal' && preset.id === 'beginner' && percent >= 80) return ['stop-signal|stop|standard'];
   if (kind === 'stop-signal' && preset.id === 'standard' && percent >= 75) return ['stop-signal|stop|fast'];
+  if (kind === 'sart' && preset.id === 'slow' && percent >= 88) return ['sart|digits|standard'];
+  if (kind === 'sart' && preset.id === 'standard' && percent >= 92) return ['sart|digits|fast'];
   return [];
 }
 
@@ -32,12 +34,34 @@ export function mountInhibition({ root, mode, preset, settings, onFinish, random
   let current;
   let shownAt;
   let accepted = false;
-  let waiting = false;
+  let waiting = true;
+  let endTimer;
+  let signalTimer;
+  const conclude = () => {
+    if (waiting) return;
+    waiting = true;
+    runtime.cancel(endTimer);
+    runtime.cancel(signalTimer);
+    current.correct = current.stop ? current.response === null : kind === 'stop-signal' ? current.response === current.direction : current.response !== null;
+    trials.push(current);
+    if (current.response !== null) {
+      root.innerHTML = `<div class="stimulus">${current.correct ? '正确' : '错误'}</div>`;
+      runtime.later(() => {
+        if (values.responseInterval) {
+          root.innerHTML = '<div class="stimulus fixation">+</div>';
+          runtime.later(next, values.responseInterval);
+        } else next();
+      }, values.feedback ?? 400);
+    } else {
+      root.innerHTML = '<div class="stimulus fixation">+</div>';
+      runtime.later(next, values.interval);
+    }
+  };
   const next = () => {
     if (trials.length >= values.count) {
       const metrics = inhibitionSummary(trials);
       const correct = metrics.goCorrect + metrics.stopCorrect;
-      const value = kind === 'sart' ? correct / trials.length : metrics.stopTotal ? metrics.stopCorrect / metrics.stopTotal : null;
+      const value = metrics.stopTotal ? metrics.stopCorrect / metrics.stopTotal : null;
       runtime.finish({ value: value === null ? null : Math.round(value * 100), detail: `${trials.length} 次中正确 ${correct} 次`, mode: mode.id, preset: preset.id, settings: values, rules: mode.ruleVersion, input: inputs.value, endReason: 'completed', scored: value !== null, metrics, trials, unlocks: inhibitionUnlock(kind, preset, metrics) });
       return;
     }
@@ -53,31 +77,29 @@ export function mountInhibition({ root, mode, preset, settings, onFinish, random
     }, (at) => {
       shownAt = at;
       waiting = false;
-      if (kind === 'stop-signal' && stop) runtime.later(() => {
+      if (kind === 'stop-signal' && stop) signalTimer = runtime.later(() => {
         current.signalAt = runtime.now() - shownAt;
         root.querySelector('#inhibition-stimulus').style.boxShadow = 'inset 0 0 0 5px #c44343';
-      }, values.delayMin + random() * (values.delayMax - values.delayMin));
-      runtime.later(() => {
-        current.correct = current.stop ? current.response === null : kind === 'stop-signal' ? current.response === current.direction : current.response !== null;
-        trials.push(current);
-        waiting = true;
-        root.innerHTML = '<div class="stimulus fixation">+</div>';
-        runtime.later(next, values.interval);
-      }, values.window);
+      }, values.delayMin + random() * ((values.delayMax ?? values.delayMin + 250) - values.delayMin));
+      endTimer = runtime.later(conclude, values.window);
     });
   };
   const answer = (value, event, input) => {
     if (waiting || accepted) return;
+    const at = inputTime(event, runtime.now);
+    if (at >= shownAt + values.window) { conclude(); return; }
     accepted = true;
     current.response = value;
-    current.responseMs = Math.max(0, inputTime(event, runtime.now) - shownAt);
+    current.responseMs = Math.max(0, at - shownAt);
     inputs.add(input);
+    conclude();
   };
   runtime.listen(root, 'pointerdown', (event) => {
     const button = event.target.closest('[data-answer]');
-    if (!button || event.button !== 0) return;
+    const stimulus = kind !== 'stop-signal' && event.target.closest('#inhibition-stimulus');
+    if ((!button && !stimulus) || event.button !== 0) return;
     event.preventDefault();
-    answer(button.dataset.answer, event, inputMethod(event));
+    answer(button ? button.dataset.answer : 'press', event, inputMethod(event));
   });
   runtime.listen(document, 'keydown', (event) => {
     if (event.repeat || event.ctrlKey || event.metaKey || event.altKey) return;
@@ -86,6 +108,9 @@ export function mountInhibition({ root, mode, preset, settings, onFinish, random
     event.preventDefault();
     answer(value, event, inputMethod(event));
   });
-  next();
+  if (kind === 'gonogo' || kind === 'stop-signal') {
+    root.innerHTML = '<div class="stimulus">准备</div>';
+    runtime.later(next, 3000);
+  } else next();
   return runtime.cleanup;
 }
