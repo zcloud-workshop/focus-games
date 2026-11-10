@@ -15,8 +15,8 @@ export function rotatePosition(index, size, turns) {
   return row * size + column;
 }
 
-export function makePath(size, length, random = Math.random) {
-  let position = Math.floor(random() * size * size);
+export function makePath(size, length, random = Math.random, startPosition) {
+  let position = startPosition ?? Math.floor(random() * size * size);
   const start = position;
   const steps = [];
   for (let index = 0; index < length; index++) {
