@@ -54,3 +54,11 @@ export function rotationShape(size, count, random = Math.random) {
   }
   return null;
 }
+
+export function unfoldHole(hole, folds) {
+  let points = [hole];
+  for (const { axis, line } of [...folds].reverse()) {
+    points = [...points, ...points.map(([x, y]) => axis === 'x' ? [2 * line - 1 - x, y] : [x, 2 * line - 1 - y])];
+  }
+  return [...new Map(points.map((point) => [point.join(','), point])).values()].sort((a, b) => a[1] - b[1] || a[0] - b[0]);
+}
