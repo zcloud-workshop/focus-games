@@ -1,4 +1,5 @@
 import { shuffle } from '../core.js';
+import { bindBoardButtons, trackInputs } from '../engines/board-input.js';
 
 export const definition = {
   id: 'pattern-recognition',
@@ -11,7 +12,7 @@ export const definition = {
     ],
     fields: [{ key: 'rounds', label: '题数', type: 'number', default: 10, min: 5, max: 30, step: 1 }],
     score: { unit: '%', lower: false, min: 0, max: 100 }, hiddenPolicy: 'invalidate',
-    inputs: ['pointer'], rule: '观察数字序列, 选择符合规律的下一项.'
+    inputs: ['pointer', 'touch', 'keyboard', 'mixed'], rule: '观察数字序列, 选择符合规律的下一项.'
   }]
 };
 
@@ -45,23 +46,24 @@ export function mount({ root, mode, preset, settings, onFinish, random = Math.ra
   let question;
   let feedback = '';
   let active = true;
+  const inputs = trackInputs();
   const cleanup = () => { active = false; controller.abort(); };
   const draw = () => {
     question = patternQuestion(settings.difficulty, random);
     root.innerHTML = `<div class="game-status"><span>第 ${round + 1} / ${settings.rounds} 题</span><span>答对 ${correct} 题</span></div><p class="stage-note">${feedback}</p><div class="stimulus" style="font-size:clamp(22px,5vw,34px);letter-spacing:0">${question.series.join(' , ')} , ?</div><div class="answer-options">${question.options.map((value) => `<button class="answer-button" data-value="${value}">${value}</button>`).join('')}</div>`;
   };
-  root.addEventListener('click', (event) => {
-    const button = event.target.closest('button[data-value]');
-    if (!button || !active) return;
+  bindBoardButtons(root, 'button[data-value]', (button, input, at) => {
+    if (!active) return;
+    inputs.add(input);
     const hit = Number(button.dataset.value) === question.answer;
     if (hit) correct++;
     feedback = `${hit ? '上一题正确' : `上一题答案 ${question.answer}`} : ${question.rule}`;
     round++;
     if (round < settings.rounds) { draw(); return; }
-    const duration = (clock.performance.now() - started) / 1000;
+    const duration = Math.max(0, at - started) / 1000;
     cleanup();
-    onFinish({ value: Math.round(correct / round * 100), detail: `${round} 题中答对 ${correct} 题`, duration, mode: mode.id, preset: preset.id, settings, rules: mode.ruleVersion, input: 'pointer', endReason: 'complete', scored: true, metrics: { correct, rounds: round }, trials: [] });
-  }, { signal: controller.signal });
+    onFinish({ value: Math.round(correct / round * 100), detail: `${round} 题中答对 ${correct} 题`, duration, mode: mode.id, preset: preset.id, settings, rules: mode.ruleVersion, input: inputs.value, endReason: 'complete', scored: true, metrics: { correct, rounds: round }, trials: [] });
+  }, controller.signal, () => clock.performance.now());
   draw();
   return cleanup;
 }
