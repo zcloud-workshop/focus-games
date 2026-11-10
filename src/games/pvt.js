@@ -1,4 +1,4 @@
-import { createRuntime, inputTime } from '../engines/runtime.js';
+import { createRuntime, inputMethod, inputTime, trackInputs } from '../engines/runtime.js';
 import { meanValidResponses, presentOnFrame } from '../engines/trials.js';
 
 export const definition = { id: 'pvt', modes: [{ id: 'vigilance', name: '持续警觉', ruleVersion: 2, presets: [
@@ -17,7 +17,7 @@ export function mount({ root, mode = definition.modes[0], preset = mode.presets[
   const runtime = createRuntime({ onFinish, clock });
   const values = { ...preset.settings, ...settings };
   const trials = [];
-  const inputs = new Set();
+  const inputs = trackInputs();
   const start = runtime.now();
   let phase = 'waiting';
   let shownAt;
@@ -25,7 +25,7 @@ export function mount({ root, mode = definition.modes[0], preset = mode.presets[
   const end = () => {
     phase = 'finished';
     const average = meanValidResponses(trials);
-    runtime.finish({ value: average, detail: average === null ? '没有有效反应样本' : `有效反应 ${trials.filter((trial) => trial.valid).length} 次`, mode: mode.id, preset: preset.id, settings: values, rules: mode.ruleVersion, input: inputs.size === 1 ? [...inputs][0] : inputs.size ? 'mixed' : 'any', endReason: 'timeout', scored: average !== null, metrics: pvtMetrics(trials, values.lapse), trials });
+    runtime.finish({ value: average, detail: average === null ? '没有有效反应样本' : `有效反应 ${trials.filter((trial) => trial.valid).length} 次`, mode: mode.id, preset: preset.id, settings: values, rules: mode.ruleVersion, input: inputs.value, endReason: 'timeout', scored: average !== null, metrics: pvtMetrics(trials, values.lapse), trials });
   };
   const draw = (label) => {
     root.innerHTML = `<div class="game-status"><span>持续警觉</span><span>剩余 ${Math.max(0, Math.ceil(values.duration - (runtime.now() - start) / 1000))} 秒</span></div><button type="button" class="reaction-area" data-pvt><strong>${label}</strong><span>点击此处或按空格</span></button>`;
@@ -53,8 +53,8 @@ export function mount({ root, mode = definition.modes[0], preset = mode.presets[
     draw(valid ? `${Math.round(responseMs)} ms` : '抢按');
     runtime.later(wait, 1000);
   };
-  runtime.listen(root, 'pointerdown', (event) => { if (event.button !== 0 || !event.target.closest('[data-pvt]')) return; event.preventDefault(); respond(event, event.pointerType === 'touch' ? 'touch' : 'pointer'); });
-  runtime.listen(document, 'keydown', (event) => { if (event.code !== 'Space' || event.repeat || event.ctrlKey || event.metaKey || event.altKey) return; event.preventDefault(); respond(event, 'keyboard'); });
+  runtime.listen(root, 'pointerdown', (event) => { if (event.button !== 0 || !event.target.closest('[data-pvt]')) return; event.preventDefault(); respond(event, inputMethod(event)); });
+  runtime.listen(document, 'keydown', (event) => { if (event.code !== 'Space' || event.repeat || event.ctrlKey || event.metaKey || event.altKey) return; event.preventDefault(); respond(event, inputMethod(event)); });
   runtime.later(end, values.duration * 1000);
   wait();
   return runtime.cleanup;
