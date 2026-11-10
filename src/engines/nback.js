@@ -8,6 +8,7 @@ export function makeChannel({ values, n, count, matchRate = 0.35, random = Math.
   }
   return sequence;
 }
+export function uniformChannel(values, length, random = Math.random) { return Array.from({ length }, () => values[Math.floor(random() * values.length)]); }
 export function scoreChannel(sequence, n, responses, omissionsAreNo = false) {
   const result = { hit: 0, miss: 0, falseAlarm: 0, correctRejection: 0, omitted: 0 };
   for (let index = n; index < sequence.length; index++) {
@@ -46,10 +47,10 @@ const tileSymbols = ['○','△','□','◇','⬡','＋','✕','☆'];
 export function makeLetterSet(random = Math.random) { return shuffle([...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'], random).slice(0, 8); }
 export function localEnglishVoice(voices) { return voices.find((voice) => voice.localService === true && /^en(?:-|$)/i.test(voice.lang)); }
 export function tileMarkup(index) { return `<svg role="img" aria-label="牌面 ${index + 1}" width="100" height="125" viewBox="0 0 100 125"><rect x="4" y="4" width="92" height="117" rx="12" fill="white" stroke="#555" stroke-width="3"/><text x="50" y="79" text-anchor="middle" font-size="51" fill="#245db0">${tileSymbols[index]}</text></svg>`; }
-export function playStimulus(audio, value, kind) {
+export function playStimulus(audio, value, kind, sourceA = false) {
   if (kind === 'timbre') {
     for (const partial of timbres[value]) audio.tone({ frequency: 261.63 * partial.harmonic, type: partial.type, gain: partial.gain, duration: 0.65 });
-  } else audio.tone({ frequency: tones[value], duration: 0.5 });
+  } else audio.tone({ frequency: sourceA ? [400, 500, 600, 700][value] : tones[value], duration: sourceA ? 0.4 : 0.5 });
 }
 
 export function mountTimed({ root, mode, preset, settings, onFinish, random = Math.random, clock = globalThis, kind }) {
@@ -59,16 +60,18 @@ export function mountTimed({ root, mode, preset, settings, onFinish, random = Ma
   const letters = ['position-letter', 'letter-only'].includes(mode.id);
   const tiles = mode.id === 'tile-tone';
   const reference = ['position-letter', 'position-only', 'letter-only', 'tile-tone'].includes(mode.id);
+  const sourceA = mode.id === 'position-tone' || !dual;
   const visualOn = dual && mode.id !== 'letter-only';
   const soundOn = mode.id !== 'position-only';
-  const n = settings.n, count = settings.count - (reference ? n : 0), interval = settings.interval;
-  const visual = visualOn ? makeChannel({ values: Array.from({ length: tiles ? 8 : 9 }, (_, i) => i), n, count, matchRate: reference ? 0.2 + 0.8 / (tiles ? 8 : 9) : 0.35, random }) : [];
+  const n = settings.n, count = settings.count - n, interval = settings.interval;
+  const visualValues = Array.from({ length: tiles ? 8 : 9 }, (_, i) => i);
+  const visual = visualOn ? sourceA ? uniformChannel(visualValues, n + count, random) : makeChannel({ values: visualValues, n, count, matchRate: 0.2 + 0.8 / visualValues.length, random }) : [];
   const soundLetters = letters ? makeLetterSet(random) : [];
   const soundValues = letters ? Array.from({ length: 8 }, (_, i) => i) : [0, 1, 2, 3];
-  const sounds = soundOn ? makeChannel({ values: soundValues, n, count, matchRate: reference ? 0.2 + 0.8 / soundValues.length : 0.35, random }) : [];
+  const sounds = soundOn ? sourceA ? uniformChannel(soundValues, n + count, random) : makeChannel({ values: soundValues, n, count, matchRate: 0.2 + 0.8 / soundValues.length, random }) : [];
   const responses = [Array(n + count).fill(null), Array(n + count).fill(null)];
   const responseTimes = [Array(n + count).fill(null), Array(n + count).fill(null)];
-  const presentedAt = [], durations = [], speechEnded = [];
+  const presentedAt = [], durations = [], visualDurations = [], speechEnded = [];
   const usedInputs = new Set();
   let index = -1, phase = 'ready', voice;
   const speech = globalThis.speechSynthesis;
@@ -85,11 +88,9 @@ export function mountTimed({ root, mode, preset, settings, onFinish, random = Ma
     const visualStats = visualOn ? scoreChannel(visual, n, responses[0], true) : null;
     const soundStats = soundOn ? scoreChannel(sounds, n, responses[1], dual) : null;
     const channels = [visualStats, soundStats].filter(Boolean);
-    const channelCorrect = channels.reduce((sum, item) => sum + correctCount(item), 0);
-    const bothCorrect = reference ? jointCorrectCount(visual, sounds, n, responses, visualOn, soundOn, count) : 0;
-    const correct = reference ? bothCorrect : channelCorrect;
-    const total = reference ? count : count * channels.length;
-    const accuracy = reference ? Math.round(correct / total * 100) : correct / total * 100;
+    const correct = reference ? jointCorrectCount(visual, sounds, n, responses, visualOn, soundOn, count) : dual ? visualStats.hit + soundStats.hit : correctCount(soundStats);
+    const total = reference ? count : dual ? count * 2 : count - soundStats.omitted;
+    const accuracy = total ? Math.round(correct / total * 100) : null;
     audio.close();
     if (letters) speech?.cancel();
     const metrics = { 正确: correct, 总判断数: total };
@@ -102,10 +103,10 @@ export function mountTimed({ root, mode, preset, settings, onFinish, random = Ma
     }
     const trials = Array.from({ length: count }, (_, offset) => {
       const i = offset + n;
-      return { index: offset + 1, presentedAt: presentedAt[i], durationMs: durations[i], ...(visualOn ? { visual: visual[i], visualTarget: visual[i] === visual[i - n], visualResponse: responses[0][i] === true, visualResponseMs: responseTimes[0][i] } : {}), ...(soundOn ? { sound: sounds[i], soundTarget: sounds[i] === sounds[i - n], soundResponse: responses[1][i], soundResponseMs: responseTimes[1][i] } : {}) };
+      return { index: offset + 1, presentedAt: presentedAt[i], durationMs: durations[i], ...(visualOn ? { visual: visual[i], visualDurationMs: visualDurations[i], visualTarget: visual[i] === visual[i - n], visualResponse: responses[0][i] === true, visualResponseMs: responseTimes[0][i] } : {}), ...(soundOn ? { sound: sounds[i], soundTarget: sounds[i] === sounds[i - n], soundResponse: responses[1][i], soundResponseMs: responseTimes[1][i] } : {}) };
     });
     const input = usedInputs.size > 1 ? 'mixed' : [...usedInputs][0] ?? 'unknown';
-    runtime.finish({ value: accuracy, detail: `正确率 ${Math.round(accuracy)}%`, mode: mode.id, preset: preset.id, settings, rules: mode.ruleVersion, input, endReason: 'completed', scored: mode.scored !== false, rankEligible: dual ? mode.id === 'position-letter' && n >= 2 && settings.count >= 20 && accuracy >= 80 : false, metrics, trials });
+    runtime.finish({ value: accuracy, detail: accuracy == null ? '没有有效作答, 本轮不计分' : `正确率 ${accuracy}%`, mode: mode.id, preset: preset.id, settings, rules: mode.ruleVersion, input, endReason: 'completed', scored: mode.scored !== false && accuracy != null, rankEligible: dual ? mode.id === 'position-letter' && n >= 2 && settings.count >= 20 && accuracy >= 80 : false, metrics, trials });
   };
   const show = () => {
     const next = index + 1;
@@ -124,6 +125,13 @@ export function mountTimed({ root, mode, preset, settings, onFinish, random = Ma
       if (index === n + count) { end(); return; }
       presentedAt[index] = timestamp;
       phase = 'trial';
+      if (sourceA && dual) {
+        const current = index;
+        runtime.later(() => {
+          if (phase !== 'trial' || index !== current) return;
+          presentOnFrame(runtime, () => root.querySelectorAll('.play-cell.lit').forEach((cell) => cell.classList.remove('lit')), (hiddenAt) => { visualDurations[current] = hiddenAt - presentedAt[current]; });
+        }, 500);
+      }
       try {
         if (letters) {
           const current = index;
@@ -133,7 +141,7 @@ export function mountTimed({ root, mode, preset, settings, onFinish, random = Ma
           utterance.onend = () => { speechEnded[current] = true; };
           utterance.onerror = () => { if (runtime.active && index === current && phase === 'trial') failSound('本地语音播放失败.'); };
           speech.speak(utterance);
-        } else if (soundOn) playStimulus(audio, sounds[index], kind === 'timbre' ? 'timbre' : 'tone');
+        } else if (soundOn) playStimulus(audio, sounds[index], kind === 'timbre' ? 'timbre' : 'tone', sourceA);
         runtime.later(show, interval);
       } catch { failSound('声音播放失败.'); }
     });
