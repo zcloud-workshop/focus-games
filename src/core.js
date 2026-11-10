@@ -3,25 +3,94 @@ export const categories = [
   { id: 'attention', name: '视觉' },
   { id: 'memory', name: '记忆' },
   { id: 'control', name: '反应' },
+  { id: 'perception', name: '感知' },
+  { id: 'spatial', name: '推理' },
+  { id: 'puzzle', name: '益智' },
   { id: 'relax', name: '放松' },
+  { id: 'tools', name: '工具' },
 ];
 
 export const games = [
-  { id: 'schulte', name: '舒尔特方格', en: 'SCHULTE GRID', category: 'attention', icon: 'grid', color: 'sage', desc: '从 1 开始, 按顺序找到每一个数字.', tag: '视觉搜索', time: '1 分钟', rule: '按从小到大的顺序点击数字. 点错不会推进, 完成所有数字后记录用时.', levels: ['3 × 3', '4 × 4', '5 × 5'], unit: '秒', lower: true },
-  { id: 'difference', name: '找不同的字', en: 'SPOT THE DIFFERENCE', category: 'attention', icon: 'search', color: 'peach', desc: '在相似的文字中, 发现那个小小不同.', tag: '细节捕捉', time: '1 分钟', rule: '每组文字中有一个不同的字. 找到它, 连续完成 10 题. 点错后可以继续寻找.', levels: ['3 × 3', '5 × 5', '7 × 7'], unit: '秒', lower: true },
-  { id: 'color', name: '色差感知', en: 'COLOR PERCEPTION', category: 'attention', icon: 'palette', color: 'lavender', desc: '观察细微色差, 找出不一样的方块.', tag: '色彩辨识', time: '1 分钟', rule: '点击颜色不同的方块, 完成 10 题. 每答对一题, 色差会变得更细微. 记录首次作答正确率.', levels: ['入门', '进阶', '挑战'], unit: '%', lower: false, max: 100 },
-  { id: 'sequence', name: '顺序记忆', en: 'SEQUENCE MEMORY', category: 'memory', icon: 'sequence', color: 'lavender', desc: '记住亮起的顺序, 在脑海里画一条路径.', tag: '序列记忆', time: '2 分钟', rule: '观察方块亮起的顺序, 再按相同顺序点击. 每轮多一个方块, 点错即结束. 记录完整记住的最长序列.', levels: ['慢速', '标准', '快速'], unit: '个', lower: false, max: 20 },
-  { id: 'numbers', name: '数字记忆', en: 'NUMBER MEMORY', category: 'memory', icon: 'numbers', color: 'sand', desc: '让数字短暂停留, 再试着把它们找回来.', tag: '短时记忆', time: '2 分钟', rule: '记住屏幕上的数字, 消失后输入完整数字. 每轮增加一位, 答错即结束. 注意保留开头的 0.', levels: ['4 秒', '3 秒', '2 秒'], unit: '位', lower: false, max: 20 },
-  { id: 'nback', name: 'N-Back', en: 'WORKING MEMORY', category: 'memory', icon: 'layers', color: 'sky', desc: '与前几步比较, 给工作记忆一点挑战.', tag: '记忆更新', time: '2 分钟', rule: '判断当前字母是否与 N 步前相同. 每次选择后进入下一题, 共 20 题. 前 N 个字母只需观察.', levels: ['1-Back', '2-Back', '3-Back'], unit: '%', lower: false, max: 100 },
-  { id: 'stroop', name: 'Stroop 色词', en: 'STROOP TEST', category: 'control', icon: 'type', color: 'peach', desc: '看颜色, 不读字. 试着绕开思维惯性.', tag: '抗干扰', time: '1 分钟', rule: '选择文字实际显示的颜色, 忽略文字含义. 共 20 题, 记录正确率. 也可按选项对应的数字键选择.', levels: ['3 色', '4 色', '5 色'], unit: '%', lower: false, max: 100 },
-  { id: 'reaction', name: '反应速度', en: 'REACTION TIME', category: 'control', icon: 'bolt', color: 'sand', desc: '等待绿色出现, 捕捉你的第一反应.', tag: '反应敏捷', time: '1 分钟', rule: '等待区域变绿后立即点击, 或按空格. 抢按会重新等待. 完成 5 次有效反应后记录平均用时.', levels: ['轻松', '标准', '挑战'], unit: 'ms', lower: true },
-  { id: 'gonogo', name: 'Go / No-Go', en: 'IMPULSE CONTROL', category: 'control', icon: 'stop', color: 'sage', desc: '该出手时出手, 该等待时保持从容.', tag: '抑制控制', time: '1 分钟', rule: '看到绿色圆形时点击或按空格, 看到红色叉号时不要操作. 共 20 轮, 每轮限时, 记录正确率.', levels: ['慢速', '标准', '快速'], unit: '%', lower: false, max: 100 },
-  { id: 'math', name: '心算挑战', en: 'MENTAL MATH', category: 'control', icon: 'math', color: 'sky', desc: '让思维热身, 用心算连接数字与答案.', tag: '思维敏捷', time: '1 分钟', rule: '心算并选择正确答案, 共 10 题. 难度提高时会加入更大的数字和乘法. 可按 1-4 键选择.', levels: ['入门', '进阶', '挑战'], unit: '%', lower: false, max: 100 },
-  { id: 'time', name: '时间感知', en: 'TIME PERCEPTION', category: 'relax', icon: 'clock', color: 'peach', desc: '不看时钟, 感受时间从指尖流过.', tag: '内在节奏', time: '1 分钟', rule: '开始计时后, 在你认为目标时间到达时点击停止. 共 3 轮, 记录平均绝对误差, 越小越接近目标.', levels: ['3 秒', '5 秒', '10 秒'], unit: '秒误差', lower: true },
-  { id: 'breath', name: '呼吸空间', en: 'A MOMENT TO BREATHE', category: 'relax', icon: 'leaf', color: 'sage', desc: '跟随圆圈, 在一呼一吸间慢下来.', tag: '放松练习', time: '1 分钟', rule: '跟随圆圈舒适地吸气、呼气, 不需要憋气. 完成 4 个呼吸周期. 如感到不适, 可随时退出.', levels: ['4 吸 / 4 呼', '4 吸 / 6 呼', '5 吸 / 7 呼'], unit: '轮', lower: false },
+  { id: 'schulte', name: '舒尔特方格', category: 'attention', icon: 'grid', tag: '依序搜索', sources: ['A01', 'T05', 'C03', 'C04'], status: 'ready', kind: 'training' },
+  { id: 'difference', name: '找不同的字', category: 'attention', icon: 'search', tag: '细节捕捉', sources: ['A02', 'T06'], status: 'ready', kind: 'training' },
+  { id: 'color', name: '色差感知', category: 'perception', icon: 'palette', tag: '色彩辨识', sources: ['A03', 'T21'], status: 'ready', kind: 'training' },
+  { id: 'change-blindness', name: '变化盲视', category: 'attention', icon: 'search', tag: '变化搜索', sources: ['A04'], status: 'ready', kind: 'training' },
+  { id: 'mot', name: '多目标追踪', category: 'attention', icon: 'focus', tag: '移动追踪', sources: ['A05', 'T09', 'C16'], status: 'ready', kind: 'training' },
+  { id: 'posner-cue', name: '注意线索', category: 'control', icon: 'arrow', tag: '空间定向', sources: ['A06'], status: 'ready', kind: 'training' },
+  { id: 'rsvp', name: '快速字母流', category: 'attention', icon: 'type', tag: '时间注意', sources: ['A07'], status: 'ready', kind: 'training' },
+  { id: 'nback', name: 'N-Back', category: 'memory', icon: 'layers', tag: '记忆更新', sources: ['A08', 'T03'], status: 'ready', kind: 'training' },
+  { id: 'dual-n-back', name: '双通道回溯', category: 'memory', icon: 'layers', tag: '视听记忆', sources: ['A09', 'C02', 'C13'], status: 'ready', kind: 'training' },
+  { id: 'numbers', name: '数字记忆', category: 'memory', icon: 'numbers', tag: '空间位置', sources: ['A10', 'T01'], status: 'ready', kind: 'training' },
+  { id: 'sequence', name: '顺序记忆', category: 'memory', icon: 'sequence', tag: '路径记忆', sources: ['A11', 'T02', 'C09', 'C12'], status: 'ready', kind: 'training' },
+  { id: 'digit-span', name: '数字广度', category: 'memory', icon: 'numbers', tag: '正背与倒背', sources: ['A12', 'C28'], status: 'ready', kind: 'training' },
+  { id: 'math', name: '心算挑战', category: 'control', icon: 'math', tag: '心算运算', sources: ['A13'], status: 'ready', kind: 'training' },
+  { id: 'reaction', name: '反应速度', category: 'control', icon: 'bolt', tag: '信号响应', sources: ['A14', 'T16', 'C05', 'C07'], status: 'ready', kind: 'training' },
+  { id: 'stroop', name: '色词判断', category: 'control', icon: 'type', tag: '抗干扰', sources: ['A15', 'T07', 'C10'], status: 'ready', kind: 'training' },
+  { id: 'gonogo', name: '响应与抑制', category: 'control', icon: 'stop', tag: '控制冲动', sources: ['A16'], status: 'ready', kind: 'training' },
+  { id: 'stop-signal', name: '停止信号', category: 'control', icon: 'stop', tag: '中止响应', sources: ['A17'], status: 'ready', kind: 'training' },
+  { id: 'sart', name: '持续注意', category: 'control', icon: 'focus', tag: '抑制与警觉', sources: ['A18'], status: 'ready', kind: 'training' },
+  { id: 'time', name: '时间感知', category: 'perception', icon: 'clock', tag: '内在节奏', sources: ['A19', 'T23', 'C26'], status: 'ready', kind: 'training' },
+  { id: 'task-switching', name: '规则切换', category: 'control', icon: 'sequence', tag: '灵活判断', sources: ['A20'], status: 'ready', kind: 'training' },
+  { id: 'flanker', name: '中心箭头', category: 'control', icon: 'arrow', tag: '侧翼干扰', sources: ['A21', 'C11'], status: 'ready', kind: 'training' },
+  { id: 'card-sorting', name: '卡片分类', category: 'control', icon: 'layers', tag: '发现规则', sources: ['A22'], status: 'ready', kind: 'training' },
+  { id: 'simon', name: '颜色与位置', category: 'control', icon: 'palette', tag: '空间冲突', sources: ['A23'], status: 'ready', kind: 'training' },
+  { id: 'mental-rotation', name: '心理旋转', category: 'spatial', icon: 'grid', tag: '旋转识别', sources: ['A24'], status: 'ready', kind: 'training' },
+  { id: 'paper-folding', name: '折纸推演', category: 'spatial', icon: 'layers', tag: '展开与打孔', sources: ['A25'], status: 'ready', kind: 'training' },
+  { id: 'matrix-reasoning', name: '矩阵推理', category: 'spatial', icon: 'grid', tag: '图形规律', sources: ['A26'], status: 'ready', kind: 'training' },
+  { id: 'auditory-attention', name: '听觉注意', category: 'memory', icon: 'focus', tag: '音调回溯', sources: ['A27'], status: 'ready', kind: 'training' },
+  { id: 'timbre-n-back', name: '音色回溯', category: 'memory', icon: 'layers', tag: '音色辨别', sources: ['A28'], status: 'ready', kind: 'training' },
+  { id: 'pattern-recognition', name: '模式识别', category: 'spatial', icon: 'sequence', tag: '数字规律', sources: ['A29'], status: 'ready', kind: 'training' },
+  { id: 'breath', name: '呼吸空间', category: 'relax', icon: 'leaf', tag: '呼吸引导', sources: ['A30', 'C23', 'C24', 'C25'], status: 'ready', kind: 'training' },
+  { id: 'color-block-imprint', name: '色块印记', category: 'memory', icon: 'grid', tag: '位置与旋转', sources: ['T04'], status: 'ready', kind: 'training' },
+  { id: 'coordinate-drift', name: '坐标迷航', category: 'memory', icon: 'focus', tag: '心中移动', sources: ['T08'], status: 'ready', kind: 'training' },
+  { id: 'puzzle', name: '行列拼图', category: 'puzzle', icon: 'grid', tag: '整行整列互换', sources: ['T10'], status: 'ready', kind: 'training' },
+  { id: 'digital-huarong-road', name: '数字滑块', category: 'puzzle', icon: 'numbers', tag: '排序还原', sources: ['T11'], status: 'ready', kind: 'training' },
+  { id: 'sudoku', name: '数独', category: 'puzzle', icon: 'grid', tag: '数字推演', sources: ['T12', 'C18'], status: 'ready', kind: 'training' },
+  { id: 'bottle-color-matching', name: '瓶色推断', category: 'puzzle', icon: 'palette', tag: '排列与反馈', sources: ['T13'], status: 'ready', kind: 'training' },
+  { id: 'number-merge', name: '数字合并', category: 'puzzle', icon: 'numbers', tag: '滑动合并', sources: ['T14'], status: 'ready', kind: 'training' },
+  { id: 'lights-out', name: '熄灯', category: 'puzzle', icon: 'grid', tag: '连锁翻转', sources: ['T15'], status: 'ready', kind: 'training' },
+  { id: 'click-speed-test', name: '点击速度', category: 'perception', icon: 'bolt', tag: '左键与触屏', sources: ['T17', 'C19'], status: 'ready', kind: 'training' },
+  { id: 'right-click-test', name: '右键速度', category: 'perception', icon: 'bolt', tag: '鼠标右键', sources: ['T18'], status: 'ready', kind: 'training' },
+  { id: 'spacebar-counter', name: '空格计数', category: 'perception', icon: 'type', tag: '键盘节奏', sources: ['T19', 'C20'], status: 'ready', kind: 'training' },
+  { id: 'dynamic-visual-acuity-test', name: '瞬时数字', category: 'memory', icon: 'numbers', tag: '短暂呈现', sources: ['T20'], status: 'ready', kind: 'training' },
+  { id: 'dynamic-color', name: '动态色差', category: 'attention', icon: 'palette', tag: '移动中辨色', sources: ['T22'], status: 'ready', kind: 'training' },
+  { id: 'matchstick-math', name: '火柴等式', category: 'puzzle', icon: 'math', tag: '移动一根', sources: ['T24'], status: 'ready', kind: 'training' },
+  { id: 'maze', name: '迷宫', category: 'puzzle', icon: 'sequence', tag: '寻找出口', sources: ['T25'], status: 'ready', kind: 'training' },
+  { id: 'number-mirror', name: '数字镜像', category: 'spatial', icon: 'numbers', tag: '镜像辨识', sources: ['T26'], status: 'ready', kind: 'training' },
+  { id: 'quick-mirror-judgment', name: '镜像速判', category: 'spatial', icon: 'layers', tag: '旋转与反射', sources: ['T27'], status: 'ready', kind: 'training' },
+  { id: 'symmetry-blocks', name: '对称方块', category: 'spatial', icon: 'grid', tag: '镜像复刻', sources: ['T28'], status: 'ready', kind: 'training' },
+  { id: 'field-of-view', name: '视野双判断', category: 'attention', icon: 'focus', tag: '中央与周边', sources: ['C01', 'C31'], status: 'ready', kind: 'training' },
+  { id: 'pvt', name: '持续警觉', category: 'control', icon: 'clock', tag: '长时等待响应', sources: ['C06'], status: 'ready', kind: 'training' },
+  { id: 'memory-match', name: '记忆配对', category: 'memory', icon: 'layers', tag: '翻牌配对', sources: ['C08', 'C22'], status: 'ready', kind: 'training' },
+  { id: 'count-boxes', name: '数箱子', category: 'spatial', icon: 'layers', tag: '立体计数', sources: ['C14'], status: 'ready', kind: 'training' },
+  { id: 'object-recall', name: '物品回忆', category: 'memory', icon: 'search', tag: '自由回忆', sources: ['C15'], status: 'ready', kind: 'training' },
+  { id: 'number-comparison', name: '较大数字', category: 'control', icon: 'numbers', tag: '快速比较', sources: ['C17'], status: 'ready', kind: 'training' },
+  { id: 'trail-making', name: '交替连线', category: 'attention', icon: 'sequence', tag: '散点连接', sources: ['C29'], status: 'ready', kind: 'training' },
+  { id: 'pomodoro', name: '番茄钟', category: 'tools', icon: 'clock', tag: '专注与休息', sources: ['C21'], status: 'ready', kind: 'tool' },
+  { id: 'bamboo-cicada', name: '竹知了', category: 'tools', icon: 'leaf', tag: '画圈与声音', sources: ['C30'], status: 'ready', kind: 'tool' },
 ];
 
-export const dailyGames = ['schulte', 'stroop', 'sequence'];
+export const legacyRules = {
+  'schulte': { levels: ['3 × 3', '4 × 4', '5 × 5'], unit: '秒', lower: true },
+  'difference': { levels: ['3 × 3', '5 × 5', '7 × 7'], unit: '秒', lower: true },
+  'color': { levels: ['入门', '进阶', '挑战'], unit: '%', lower: false, max: 100 },
+  'sequence': { levels: ['慢速', '标准', '快速'], unit: '个', lower: false, max: 20 },
+  'numbers': { levels: ['4 秒', '3 秒', '2 秒'], unit: '位', lower: false, max: 20 },
+  'nback': { levels: ['1-Back', '2-Back', '3-Back'], unit: '%', lower: false, max: 100 },
+  'stroop': { levels: ['3 色', '4 色', '5 色'], unit: '%', lower: false, max: 100 },
+  'reaction': { levels: ['轻松', '标准', '挑战'], unit: 'ms', lower: true },
+  'gonogo': { levels: ['慢速', '标准', '快速'], unit: '%', lower: false, max: 100 },
+  'math': { levels: ['入门', '进阶', '挑战'], unit: '%', lower: false, max: 100 },
+  'time': { levels: ['3 秒', '5 秒', '10 秒'], unit: '秒误差', lower: true },
+  'breath': { levels: ['4 吸 / 4 呼', '4 吸 / 6 呼', '5 吸 / 7 呼'], unit: '轮', lower: false },
+};
+
+export const dailyChallenges = [
+  { game: 'schulte', mode: 'numbers', preset: 'beginner' },
+  { game: 'reaction', mode: 'color', preset: 'five' },
+  { game: 'sequence', mode: 'forward', preset: 'standard' },
+];
+export const dailyGames = dailyChallenges.map((entry) => entry.game);
 
 export function shuffle(items, random = Math.random) {
   const result = [...items];
@@ -37,6 +106,7 @@ export function localDate(date = new Date()) {
 }
 
 export function summarize(records, now = new Date()) {
+  records = records.filter((record) => record.scored !== false && record.kind !== 'tool' && !games.some((game) => game.id === record.game && game.kind === 'tool'));
   const today = records.filter((record) => localDate(new Date(record.at)) === localDate(now));
   const days = new Set(records.map((record) => localDate(new Date(record.at))));
   const cursor = new Date(now);
