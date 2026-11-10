@@ -46,3 +46,12 @@ test('N-Back 为每种难度生成 20 个可计分比较和预热字母', () => 
     for (let i = n; i < different.length; i++) assert.notEqual(different[i], different[i - n]);
   }
 });
+
+test('练习与工具不改变训练次数、时长和连续天数', () => {
+  const now = new Date(2026, 10, 10, 12);
+  const stats = summarize([{ ...record('pomodoro', 25), kind: 'tool', duration: 1500 }, { ...record('sequence', 3), scored: false }], now);
+  assert.equal(stats.today, 0);
+  assert.equal(stats.seconds, 0);
+  assert.equal(stats.streak, 0);
+  assert.equal(stats.completed.size, 0);
+});
