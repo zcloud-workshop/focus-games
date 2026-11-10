@@ -42,14 +42,14 @@ test('数字比较按等级验证次数与正确率, 已解锁等级可恢复', 
   assert.equal(highestNumberLevel({ unlocks: { 'number-comparison|level|3': {}, other: {} } }), 3);
 });
 
-test('四则运算候选唯一且除法可整除', () => {
+test('心算候选唯一且算式结果正确', () => {
   const random = seeded(8);
   for (const variant of ['single', 'two-digit', 'multiply']) {
     for (let i = 0; i < 300; i++) {
       const trial = choiceTrial('math', { variant }, random);
       assert.equal(new Set(trial.options).size, 4);
-      const [, a, operator, b] = trial.stimulus.match(/^(\d+) ([+−×÷]) (\d+)$/);
-      const expected = operator === '+' ? Number(a) + Number(b) : operator === '−' ? Number(a) - Number(b) : operator === '×' ? Number(a) * Number(b) : Number(a) / Number(b);
+      const [, a, operator, b, c = '0'] = trial.stimulus.match(/^(\d+) ([+−×]) (\d+)(?: \+ (\d+))?$/);
+      const expected = operator === '+' ? Number(a) + Number(b) : operator === '−' ? Number(a) - Number(b) : Number(a) * Number(b) + Number(c);
       assert.ok(Number.isInteger(expected));
       assert.equal(Number(trial.options[trial.answer]), expected);
     }
@@ -75,10 +75,12 @@ test('色词反向模式答案取字义, 而正向模式取显示颜色', () => 
 
 test('线索有效与无效比例两端按规则生成', () => {
   const valid = choiceTrial('posner-cue', { validRate: 100 }, seeded(2));
-  const invalid = choiceTrial('posner-cue', { validRate: 0 }, seeded(2));
+  const invalid = choiceTrial('posner-cue', { validRate: 0 }, () => 0.1);
   assert.equal(valid.group, 'valid');
   assert.equal(invalid.group, 'invalid');
   assert.notEqual(valid.cue, invalid.cue);
+  const neutral = choiceTrial('posner-cue', { validRate: 50 }, () => 0.9);
+  assert.equal(neutral.group, 'neutral');
 });
 
 test('规则切换比例两端分别保持与切换上一规则', () => {
