@@ -1,6 +1,6 @@
 import { shuffle } from '../core.js';
 import { swapAdjacent } from '../engines/boards.js';
-import { inputTime } from '../engines/runtime.js';
+import { inputMethod, inputTime, trackInputs } from '../engines/runtime.js';
 
 export const definition = {
   id: 'puzzle',
@@ -39,13 +39,13 @@ export function mount({ root, mode, preset, settings, onFinish, random = Math.ra
   let preview = false;
   let imageId = 'default';
   let loadVersion = 0;
-  const inputs = new Set();
+  let inputs = trackInputs();
   const cleanup = () => { active = false; controller.abort(); };
   const reset = () => {
     rowOrder = shuffle(Array.from({ length: rows }, (_, i) => i), random);
     colOrder = shuffle(Array.from({ length: cols }, (_, i) => i), random);
     if (rowOrder.every((value, index) => value === index) && colOrder.every((value, index) => value === index)) [colOrder[0], colOrder[1]] = [colOrder[1], colOrder[0]];
-    started = null; moves = 0; preview = false; inputs.clear(); draw();
+    started = null; moves = 0; preview = false; inputs = trackInputs(); draw();
   };
   root.innerHTML = '<div class="game-status"><span data-status></span><span data-error role="status"></span></div><canvas width="600" height="600" aria-label="拖动行列的图片拼图" style="display:block;max-width:100%;width:400px;margin:auto;touch-action:none"></canvas><div class="answer-options"><button type="button" class="answer-button" data-preview>按住预览原图</button><label class="answer-button" style="max-width:100%;min-width:0">选择图片<input data-file type="file" accept="image/*" style="max-width:100%;min-width:0"></label></div>';
   const canvas = root.querySelector('canvas');
@@ -64,7 +64,7 @@ export function mount({ root, mode, preset, settings, onFinish, random = Math.ra
   canvas.addEventListener('pointerdown', (event) => {
     if (!active || preview || gesture || event.button !== 0) return;
     const bounds = canvas.getBoundingClientRect();
-    gesture = { x: event.clientX, y: event.clientY, row: Math.min(rows - 1, Math.floor((event.clientY - bounds.top) / bounds.height * rows)), col: Math.min(cols - 1, Math.floor((event.clientX - bounds.left) / bounds.width * cols)), axis: null, input: event.pointerType === 'touch' ? 'touch' : 'pointer', pointerId: event.pointerId };
+    gesture = { x: event.clientX, y: event.clientY, row: Math.min(rows - 1, Math.floor((event.clientY - bounds.top) / bounds.height * rows)), col: Math.min(cols - 1, Math.floor((event.clientX - bounds.left) / bounds.width * cols)), axis: null, input: inputMethod(event), pointerId: event.pointerId };
     canvas.setPointerCapture(event.pointerId);
   }, { signal: controller.signal });
   canvas.addEventListener('pointermove', (event) => {
@@ -91,7 +91,7 @@ export function mount({ root, mode, preset, settings, onFinish, random = Math.ra
       if (rowOrder.every((value, index) => value === index) && colOrder.every((value, index) => value === index)) {
         const duration = Math.max(0, at - started) / 1000;
         cleanup();
-        onFinish({ value: duration, detail: `还原 ${rows} × ${cols}, 交换 ${moves} 次`, duration, mode: mode.id, preset: preset.id, settings: { ...settings, image: imageId }, rules: mode.ruleVersion, input: inputs.size === 1 ? [...inputs][0] : 'mixed', endReason: 'complete', scored: true, metrics: { moves }, trials: [] });
+        onFinish({ value: duration, detail: `还原 ${rows} × ${cols}, 交换 ${moves} 次`, duration, mode: mode.id, preset: preset.id, settings: { ...settings, image: imageId }, rules: mode.ruleVersion, input: inputs.value, endReason: 'complete', scored: true, metrics: { moves }, trials: [] });
         return;
       }
     }
