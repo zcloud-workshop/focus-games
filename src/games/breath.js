@@ -3,7 +3,22 @@ import { createRuntime } from '../engines/runtime.js';
 export const definition = {
   id: 'breath',
   modes: [{
-    id: 'guided', name: '呼吸引导', ruleVersion: 2,
+    id: 'staged', name: '循序呼吸', ruleVersion: 2,
+    presets: [
+      { id: 'beginner', name: '初级 4 / 4 / 4', settings: { inhale: 4, holdIn: 4, exhale: 4, holdOut: 0 } },
+      { id: 'intermediate', name: '中级 4 / 7 / 8', settings: { inhale: 4, holdIn: 7, exhale: 8, holdOut: 0 }, unlock: { key: 'breath|staged|intermediate', requires: ['breath|staged|intermediate'] } },
+      { id: 'advanced', name: '高级 5 / 10 / 10', settings: { inhale: 5, holdIn: 10, exhale: 10, holdOut: 0 }, unlock: { key: 'breath|staged|advanced', requires: ['breath|staged|advanced'] } },
+      { id: 'box', name: '箱式 4 / 4 / 4 / 4', settings: { inhale: 4, holdIn: 4, exhale: 4, holdOut: 4 }, unlock: { key: 'breath|staged|box', requires: ['breath|staged|box'] } },
+      { id: 'custom', name: '自定义', settings: { inhale: 4, holdIn: 4, exhale: 4, holdOut: 0 }, unlock: { key: 'breath|staged|intermediate', requires: ['breath|staged|intermediate'] }, fields: [
+        { key: 'inhale', label: '吸气', type: 'number', default: 4, min: 1, max: 30, step: 1, unit: '秒' },
+        { key: 'holdIn', label: '屏息', type: 'number', default: 4, min: 0, max: 30, step: 1, unit: '秒' },
+        { key: 'exhale', label: '呼气', type: 'number', default: 4, min: 1, max: 30, step: 1, unit: '秒' },
+      ] },
+    ],
+    score: { unit: '轮', lower: false, min: 0 }, hiddenPolicy: 'invalidate', inputs: ['pointer', 'keyboard'],
+    rule: '跟随引导完成 3 轮. 如感到不适, 请随时停止.',
+  }, {
+    id: 'guided', name: '定时呼吸', ruleVersion: 2,
     presets: [
       { id: 'resonance', name: '4 / 6', settings: { inhale: 4, holdIn: 0, exhale: 6, holdOut: 0, minutes: 5 } },
       { id: 'box', name: '4 / 4 / 4 / 4', settings: { inhale: 4, holdIn: 4, exhale: 4, holdOut: 4, minutes: 5 } },
@@ -34,6 +49,9 @@ export function breathPhase(seconds, settings) {
 export function mount({ root, mode = definition.modes[0], preset = mode.presets[0], settings = preset.settings, onFinish, clock = globalThis }) {
   const runtime = createRuntime({ onFinish, clock });
   const values = { ...preset.settings, ...settings };
+  const staged = mode.id === 'staged';
+  const cycle = values.inhale + values.holdIn + values.exhale + values.holdOut;
+  const goal = staged ? cycle * 3 : values.minutes * 60;
   let started = runtime.now();
   let pausedAt = null;
   let pauseTime = 0;
@@ -41,15 +59,16 @@ export function mount({ root, mode = definition.modes[0], preset = mode.presets[
   const circle = root.querySelector('.breath-circle');
   const render = () => {
     if (!runtime.active) return;
-    const elapsed = Math.min(values.minutes * 60, ((pausedAt ?? runtime.now()) - started - pauseTime) / 1000);
+    const elapsed = Math.min(goal, ((pausedAt ?? runtime.now()) - started - pauseTime) / 1000);
     const phase = breathPhase(elapsed, values);
     root.querySelector('#breath-round').textContent = `已完成 ${phase.cycles} 轮`;
     root.querySelector('#breath-label').textContent = phase.label;
     root.querySelector('#breath-count').textContent = Math.ceil(phase.remaining);
     const scale = phase.label === '吸气' ? 1 + phase.progress * 0.35 : phase.label === '呼气' ? 1.35 - phase.progress * 0.35 : (values.holdOut && elapsed % (values.inhale + values.holdIn + values.exhale + values.holdOut) >= values.inhale + values.holdIn + values.exhale ? 1 : 1.35);
     circle.style.transform = `scale(${scale})`;
-    if (elapsed >= values.minutes * 60) {
-      runtime.finish({ value: phase.cycles, detail: `完成 ${phase.cycles} 个完整呼吸周期`, mode: mode.id, preset: preset.id, settings: values, rules: mode.ruleVersion, input: 'any', endReason: 'completed', scored: true, metrics: { activeSeconds: elapsed } });
+    if (elapsed >= goal) {
+      const next = { beginner: 'intermediate', intermediate: 'advanced', advanced: 'box' }[preset.id];
+      runtime.finish({ value: phase.cycles, detail: `完成 ${phase.cycles} 个完整呼吸周期`, mode: mode.id, preset: preset.id, settings: values, rules: mode.ruleVersion, input: 'any', endReason: 'completed', scored: true, metrics: { activeSeconds: elapsed }, unlocks: staged && next ? [`breath|staged|${next}`] : [] });
       return;
     }
     runtime.frame(render);
