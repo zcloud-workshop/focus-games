@@ -6,7 +6,7 @@ import { uniquePositions } from '../engines/sequence.js';
 const score = { unit: '个', lower: false, min: 0 };
 const mode = (id, name, presets, extra = {}) => ({ id, name, ruleVersion: 2, presets, score, hiddenPolicy: 'invalidate', inputs: ['pointer', 'keyboard', 'touch'], rule: '观察位置出现的顺序, 然后按要求复现. 每轮增加一步.', ...extra });
 export const definition = { id: 'sequence', modes: [
-  mode('grid', '方格序列', [{ id: 'slow', name: '3 × 3 慢速', settings: { size: 3, speed: 650, start: 1 } }, { id: 'fast', name: '3 × 3 快速', settings: { size: 3, speed: 350, start: 1 } }, { id: 'large', name: '4 × 4', settings: { size: 4, speed: 450, start: 1 } }], { fields: [{ key: 'size', label: '网格边长', type: 'number', default: 3, min: 2, max: 5, step: 1 }, { key: 'speed', label: '显示时长', type: 'number', default: 650, min: 150, max: 1500, step: 50, unit: '毫秒' }] }),
+  mode('grid', '方格序列', [{ id: 'slow', name: '3 × 3 慢速', settings: { size: 3, speed: 600, start: 1 } }, { id: 'fast', name: '3 × 3 快速', settings: { size: 3, speed: 350, start: 1 }, unlock: { requires: ['sequence:medium'] } }, { id: 'large', name: '4 × 4', settings: { size: 4, speed: 350, start: 1 }, unlock: { requires: ['sequence:hard'] } }, { id: 'custom', name: '自定义', settings: { size: 3, speed: 600, start: 1 }, unlock: { requires: ['sequence:medium'] }, fields: [{ key: 'size', label: '网格边长', type: 'number', min: 3, max: 3, step: 1, maxByUnlock: [{ key: 'sequence:hard', max: 5 }] }, { key: 'speed', label: '显示时长', type: 'number', min: 600, max: 800, step: 50, unit: '毫秒', minByUnlock: [{ key: 'sequence:medium', min: 350 }, { key: 'sequence:hard', min: 200 }] }] }], { ruleVersion: 3 }),
   mode('buttons', '按钮序列', [{ id: 'standard', name: '标准', settings: { size: 3, speed: 500, start: 1 } }]),
   mode('forward', '正序挑战', [{ id: 'standard', name: '3 步起', settings: { size: 3, speed: 800, start: 3 } }], { ruleVersion: 3 }),
   mode('backward', '倒序挑战', [{ id: 'standard', name: '3 步起', settings: { size: 3, speed: 800, start: 3 } }], { ruleVersion: 3, rule: '观察位置亮起的顺序, 按倒序复现.' }),
@@ -30,6 +30,7 @@ export function mount({ root, mode, preset, settings, onFinish, random = Math.ra
   if (mode.id === 'path') return mountPath({ root, mode, preset, settings, onFinish, random, clock });
   const runtime = createRuntime({ onFinish, clock });
   const inputKind = createInputTracker(runtime, root);
+  const grid = mode.id === 'grid';
   const challenge = ['forward', 'backward', 'practice', 'backward-practice'].includes(mode.id);
   let sequence = challenge ? makeChallengeSequence(settings.start, random) : [];
   if (!challenge) for (let i = 0; i < settings.start; i++) sequence = extendSequence(sequence, settings.size, random);
@@ -59,7 +60,7 @@ export function mount({ root, mode, preset, settings, onFinish, random = Math.ra
       presentOnFrame(runtime, () => cell.classList.add('lit'), (shownAt) => {
         const clear = () => presentOnFrame(runtime, () => cell.classList.remove('lit'), (hiddenAt) => {
           roundTrial.cues.push({ target, presentedAt: shownAt, durationMs: hiddenAt - shownAt });
-          runtime.later(next, challenge ? 200 : 250);
+          runtime.later(next, challenge || grid ? 200 : 250);
         });
         if (!marker) { runtime.later(clear, settings.speed); return; }
         const [fromX, fromY] = place(previous);
@@ -85,13 +86,13 @@ export function mount({ root, mode, preset, settings, onFinish, random = Math.ra
     if (Number(cell.dataset.cell) !== expected[position]) {
       phase = 'finished';
       roundTrial.correct = false;
-      runtime.finish({ value: completed, detail: `最长完整序列 ${completed} 步`, mode: mode.id, preset: preset.id, settings, rules: mode.ruleVersion, input: inputKind(), endReason: 'mistake', scored: mode.scored !== false, rankEligible: ['forward', 'backward'].includes(mode.id) && completed >= 3, metrics: { completed }, trials });
+      runtime.finish({ value: completed, detail: `最长完整序列 ${completed} 步`, mode: mode.id, preset: preset.id, settings, rules: mode.ruleVersion, input: inputKind(), endReason: 'mistake', scored: mode.scored !== false, rankEligible: ['forward', 'backward'].includes(mode.id) && completed >= 3, metrics: { completed }, trials, unlocks: grid ? [...(preset.id === 'slow' && completed >= 6 ? ['sequence:medium'] : []), ...(preset.id === 'fast' && completed >= 5 ? ['sequence:hard'] : [])] : [] });
       return;
     }
     cell.classList.add('correct');
     runtime.later(() => cell.classList.remove('correct'), 200);
     position++;
-    if (position === sequence.length) { roundTrial.correct = true; completed = sequence.length; phase = 'waiting'; sequence = challenge ? makeChallengeSequence(sequence.length + 1, random) : extendSequence(sequence, settings.size, random); runtime.later(show, 500); }
+    if (position === sequence.length) { roundTrial.correct = true; completed = sequence.length; phase = 'waiting'; sequence = challenge ? makeChallengeSequence(sequence.length + 1, random) : grid ? Array.from({ length: sequence.length + 1 }, () => Math.floor(random() * settings.size ** 2)) : extendSequence(sequence, settings.size, random); runtime.later(show, grid ? 800 : 500); }
   });
   show();
   return runtime.cleanup;
