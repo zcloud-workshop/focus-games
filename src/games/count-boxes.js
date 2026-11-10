@@ -1,22 +1,33 @@
 export const definition = {
   id: 'count-boxes',
   modes: [{
-    id: 'levels', name: '数箱子', ruleVersion: 2,
-    presets: [{ id: 'standard', name: '逐关挑战', settings: {} }],
-    score: { unit: '关', lower: false, min: 0 }, hiddenPolicy: 'invalidate',
+    id: 'six-level', name: '数箱子', ruleVersion: 3,
+    presets: [{ id: 'standard', name: '六关挑战', settings: {} }],
+    score: { unit: '%', lower: false, min: 0, max: 100 }, hiddenPolicy: 'invalidate',
     inputs: ['keyboard', 'pointer', 'touch', 'mixed'], warning: '本训练会短暂显示图形.',
     rule: '观察一排箱子堆叠, 消失后输入总数.'
   }]
 };
 
+const levels = [
+  { count: [3, 4], observe: [800, 1000] },
+  { count: [4, 6], observe: [700, 800], moving: true },
+  { count: [5, 7], observe: [600, 800], moving: true },
+  { count: [7, 9], observe: [600, 800], moving: true },
+  { count: [3, 4], observe: [250, 300] },
+  { count: [20, 23], observe: [300, 400] },
+];
+
 export function createBoxScene(level, random = Math.random) {
   const heights = Array(9).fill(0);
-  const count = Math.min(27, level + 2);
+  const config = levels[level - 1];
+  const count = config.count[0] + Math.floor(random() * (config.count[1] - config.count[0] + 1));
   for (let i = 0; i < count; i++) {
     const available = heights.flatMap((height, index) => height < 3 ? [index] : []);
     heights[available[Math.floor(random() * available.length)]]++;
   }
-  return { heights, count };
+  const observeMs = config.observe[0] + Math.floor(random() * (config.observe[1] - config.observe[0] + 1));
+  return { heights, count, observeMs, moving: Boolean(config.moving && random() < 0.5) };
 }
 
 export function boxProjection(heights) {
@@ -33,6 +44,7 @@ export function mount({ root, mode, preset, settings, onFinish, random = Math.ra
   const started = clock.performance.now();
   let scene;
   let completed = 0;
+  let correct = 0;
   let displayedAt;
   let timer;
   let frame;
@@ -40,23 +52,32 @@ export function mount({ root, mode, preset, settings, onFinish, random = Math.ra
   let accepting = false;
   const inputs = trackInputs();
   let lastAt;
-  const exposures = [];
+  const trials = [];
   const cleanup = () => { active = false; controller.abort(); clock.clearTimeout(timer); clock.cancelAnimationFrame(frame); };
   const next = () => {
     accepting = false;
     scene = createBoxScene(completed + 1, random);
-    root.innerHTML = `<div class="game-status"><span>第 ${completed + 1} 关</span><span>观察箱子</span></div><div style="text-align:center" data-scene></div>`;
+    root.innerHTML = `<div class="game-status"><span>第 ${completed + 1} / 6 关</span><span>观察箱子</span></div><div style="text-align:center;overflow:hidden" data-scene></div>`;
     frame = clock.requestAnimationFrame(() => {
       if (!active) return;
       root.querySelector('[data-scene]').innerHTML = sceneSvg(scene.heights);
       displayedAt = clock.performance.now();
-      timer = clock.setTimeout(() => { frame = clock.requestAnimationFrame(() => {
+      const hide = () => {
         if (!active) return;
-        exposures.push(clock.performance.now() - displayedAt);
+        scene.exposureMs = clock.performance.now() - displayedAt;
         accepting = true;
-        root.innerHTML = `<div class="game-status"><span>第 ${completed + 1} 关</span><span>输入箱子总数</span></div><form class="number-form"><label>共有多少箱?<input type="number" min="1" max="27" inputmode="numeric" required></label><button class="button primary">确认</button></form>`;
+        root.innerHTML = `<div class="game-status"><span>第 ${completed + 1} / 6 关</span><span>输入箱子总数</span></div><form class="number-form"><label>共有多少箱?<input type="number" min="1" max="27" inputmode="numeric" required></label><button class="button primary">确认</button></form>`;
         root.querySelector('input').focus();
-      }); }, 2000);
+      };
+      if (scene.moving) {
+        const animate = () => {
+          if (!active) return;
+          const progress = Math.min(1, (clock.performance.now() - displayedAt) / 3000);
+          root.querySelector('[data-scene] svg').style.transform = `translateX(${(progress * 2 - 1) * 100}%)`;
+          if (progress < 1) frame = clock.requestAnimationFrame(animate); else hide();
+        };
+        frame = clock.requestAnimationFrame(animate);
+      } else timer = clock.setTimeout(() => { frame = clock.requestAnimationFrame(hide); }, scene.observeMs);
     });
   };
   root.addEventListener('pointerdown', (event) => {
@@ -73,10 +94,19 @@ export function mount({ root, mode, preset, settings, onFinish, random = Math.ra
     event.preventDefault();
     if (!accepting || !active) return;
     accepting = false;
-    if (Number(root.querySelector('input').value) === scene.count) { completed++; next(); return; }
-    const duration = Math.max(0, (lastAt ?? inputTime(event, () => clock.performance.now())) - started) / 1000;
-    cleanup();
-    onFinish({ value: completed, detail: `完成 ${completed} 关, 本关共有 ${scene.count} 箱`, duration, mode: mode.id, preset: preset.id, settings, rules: mode.ruleVersion, input: inputs.value, endReason: 'incorrect', scored: true, metrics: { completed }, trials: exposures.map((exposureMs) => ({ exposureMs })) });
+    const answer = Number(root.querySelector('input').value);
+    const hit = answer === scene.count;
+    if (hit) correct++;
+    completed++;
+    trials.push({ level: completed, answer, correct: hit, correctAnswer: scene.count, exposureMs: scene.exposureMs, moving: scene.moving, responseAtMs: Math.max(0, (lastAt ?? inputTime(event, () => clock.performance.now())) - started) });
+    root.innerHTML = `<div class="game-status"><span>第 ${completed} / 6 关</span><span>${hit ? '正确' : '未答对'}</span></div><p class="stage-note">共有 ${scene.count} 箱</p><div style="text-align:center">${sceneSvg(scene.heights)}</div>`;
+    timer = clock.setTimeout(() => {
+      if (!active) return;
+      if (completed < 6) { next(); return; }
+      const duration = Math.max(0, clock.performance.now() - started) / 1000;
+      cleanup();
+      onFinish({ value: Math.round(correct / 6 * 100), detail: `6 关中答对 ${correct} 关`, duration, mode: mode.id, preset: preset.id, settings, rules: mode.ruleVersion, input: inputs.value, endReason: 'complete', scored: true, metrics: { correct, completed }, trials });
+    }, completed === 6 ? 1000 : 3000);
   }, { signal: controller.signal });
   next();
   return cleanup;
