@@ -156,3 +156,7 @@ export function createLights(min, max, random = Math.random) {
   }
   throw new Error('未能生成符合难度的灯阵.');
 }
+
+export function matchingPositions(left, right) {
+  return left.reduce((count, value, index) => count + Number(value === right[index]), 0);
+}
