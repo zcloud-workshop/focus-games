@@ -117,7 +117,7 @@ function render() {
   if (!isGame) view = ['training', 'favorites', 'records', 'guide'].includes(route) ? route : 'training';
   const stats = summarize(saved.records);
   const heading = { training: '训练', favorites: '收藏', records: '记录', guide: '关于' }[view];
-  app.innerHTML = `${navigation()}<main id="main-content">${view === 'records' || view === 'guide' ? `<div class="page-heading"><h1>${heading}.</h1></div>` : ''}${view === 'records' ? recordsContent(stats) : view === 'guide' ? guideContent() : trainingContent()}<footer class="footer"><span>Focus Lab</span><a href="#guide">关于 ${icon('chevron')}</a></footer></main><dialog id="game-dialog" aria-labelledby="dialog-title"><div id="dialog-content"></div></dialog>`;
+  app.innerHTML = `${navigation()}<main id="main-content">${view === 'records' || view === 'guide' ? `<div class="page-heading"><h1>${heading}.</h1></div>` : ''}${view === 'records' ? recordsContent(stats) : view === 'guide' ? guideContent() : trainingContent()}<footer class="footer"><span>© 2026 天津电子信息职业技术学院 · 智云工坊</span><a href="#guide">关于 ${icon('chevron')}</a></footer></main><dialog id="game-dialog" aria-labelledby="dialog-title"><div id="dialog-content"></div></dialog>`;
   document.querySelector('#game-search')?.addEventListener('input', (event) => { search = event.target.value; updateCards(); });
   const dialog = document.querySelector('#game-dialog');
   dialog.addEventListener('cancel', (event) => { event.preventDefault(); closeGame(); });
