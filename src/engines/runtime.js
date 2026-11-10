@@ -16,6 +16,7 @@ export function createRuntime({ onFinish, clock = globalThis } = {}) {
     frames.clear();
   };
   const later = (callback, delay) => {
+    if (!active) return;
     const timer = clock.setTimeout(() => {
       timers.delete(timer);
       if (active) callback();
@@ -28,6 +29,7 @@ export function createRuntime({ onFinish, clock = globalThis } = {}) {
     timers.delete(timer);
   };
   const frame = (callback) => {
+    if (!active) return;
     const id = clock.requestAnimationFrame((timestamp) => {
       frames.delete(id);
       if (active) callback(timestamp);
@@ -36,6 +38,7 @@ export function createRuntime({ onFinish, clock = globalThis } = {}) {
     return id;
   };
   const listen = (target, type, callback, options = {}) => {
+    if (!active) return;
     target.addEventListener(type, callback, { ...options, signal: controller.signal });
   };
   const finish = (result) => {
