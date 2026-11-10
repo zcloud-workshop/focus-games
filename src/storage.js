@@ -12,8 +12,23 @@ const definitions = new Map();
 
 // v2 值域来自升级前的模块定义 (如 7214dd6、0eb2480^、f62c324^); 不从记录推断规则.
 const oldScores = {
+  'numbers|digits|2': { unit: '个', lower: false, min: 0 },
+  'numbers|letters|2': { unit: '个', lower: false, min: 0 },
+  'sequence|grid|2': { unit: '个', lower: false, min: 0 },
+  'digit-span|standard|2': { unit: '位', lower: false, min: 0 },
+  'nback|letters|2': { unit: '%', lower: false, min: 0, max: 100 },
+  'dual-n-back|position-tone|2': { unit: '%', lower: false, min: 0, max: 100 },
+  'auditory-attention|pitch|2': { unit: '%', lower: false, min: 0, max: 100 },
+  'timbre-n-back|timbre|2': { unit: '%', lower: false, min: 0, max: 100 },
+  'mot|glow|2': { unit: '关', lower: false, min: 0 },
+  'difference|rounds|2': { unit: '秒', lower: true, min: 0 },
+  'color|streak|2': { unit: '次', lower: false, min: 0 },
+  'mot|fixed|2': { unit: '%', lower: false, min: 0, max: 100 },
+  'rsvp|letters|2': { unit: '%', lower: false, min: 0, max: 100 },
+  'time|fixed|2': { unit: '秒误差', lower: true, min: 0 },
   'breath|guided|2': { unit: '轮', lower: false, min: 0 },
   'count-boxes|levels|2': { unit: '关', lower: false, min: 0 },
+  'change-blindness|alternating|2': { unit: '秒', lower: true, min: 0 },
   'dual-n-back|position-letter|2': { unit: '%', lower: false, min: 0, max: 100 },
   'dual-n-back|tile-tone|2': { unit: '%', lower: false, min: 0, max: 100 },
   'dual-n-back|tutorial|2': { unit: '%', lower: false, min: 0, max: 100 },
