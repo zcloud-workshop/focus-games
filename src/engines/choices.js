@@ -16,7 +16,8 @@ export const choiceFields = {
 
 export function choiceTrial(kind, settings, random = Math.random, index = 0, previousRule, target) {
   const direction = target?.direction ?? (random() < 0.5 ? 0 : 1);
-  const conflict = random() < (kind === 'posner-cue' ? 1 - (settings.validRate ?? 80) / 100 : kind === 'stroop' ? 1 - (settings.congruentRate ?? 50) / 100 : kind === 'flanker' ? (settings.conflictRate ?? 50) / 100 : 0.5);
+  const sample = random();
+  const conflict = sample < (kind === 'posner-cue' ? 1 - (settings.validRate ?? 80) / 100 : kind === 'stroop' ? 1 - (settings.congruentRate ?? 50) / 100 : (settings.conflictRate ?? 50) / 100);
   if (kind === 'flanker') {
     const group = target?.group ?? (settings.neutral && random() < 1 / 3 ? 'neutral' : conflict ? 'conflict' : 'congruent');
     const center = direction ? '→' : '←';
@@ -29,13 +30,14 @@ export function choiceTrial(kind, settings, random = Math.random, index = 0, pre
     return { stimulus: `<span style="display:inline-block;width:45%;text-align:${position ? 'right' : 'left'};color:${direction ? '#3275bf' : '#c44343'}">●</span>`, options: ['红 / 左', '蓝 / 右'], answer: direction, group: conflict ? 'conflict' : 'congruent' };
   }
   if (kind === 'posner-cue') {
-    const cue = conflict ? 1 - direction : direction;
-    return { cue: cue ? '→' : '←', stimulus: direction ? '□　●' : '●　□', options: ['←', '→'], answer: direction, group: conflict ? 'invalid' : 'valid' };
+    const group = sample < (settings.validRate ?? 80) / 100 ? 'valid' : sample < (settings.validRate ?? 80) / 100 + 0.2 ? 'invalid' : 'neutral';
+    const cue = group === 'neutral' ? '＋' : (group === 'valid' ? direction : 1 - direction) ? '→' : '←';
+    return { cue, stimulus: direction ? '□　●' : '●　□', options: ['←', '→'], answer: direction, group };
   }
   if (kind === 'task-switching') {
     const rule = settings.order === 'alternate' ? index % 2 : previousRule === undefined ? Math.floor(random() * 2) : random() < (settings.switchRate ?? 50) / 100 ? 1 - Number(previousRule) : Number(previousRule);
     const shape = random() < 0.5 ? 0 : 1;
-    return { stimulus: `<span style="color:${direction ? '#3275bf' : '#c44343'}">${shape ? '▲' : '●'}</span>`, hint: rule ? '判断形状' : '判断颜色', options: rule ? ['圆', '三角'] : ['红', '蓝'], answer: rule ? shape : direction, group: String(rule) };
+    return { stimulus: `<span style="color:${direction ? '#3275bf' : '#c44343'}">${shape ? '■' : '●'}</span>`, hint: rule ? '判断形状' : '判断颜色', options: rule ? ['圆', '方'] : ['红', '蓝'], answer: rule ? shape : direction, group: String(rule) };
   }
   if (kind === 'stroop') {
     const palette = (settings.palette === 'six' ? sixColors : colors).slice(0, settings.colors ?? 3);
@@ -54,14 +56,24 @@ export function choiceTrial(kind, settings, random = Math.random, index = 0, pre
     const b = pick(candidates, random);
     return { stimulus: '选择较大的数字', options: [String(a), String(b)], answer: a > b ? 0 : 1, group: 'comparison' };
   }
-  const limit = settings.variant === 'two-digit' ? 90 : 9;
-  const a = Math.floor(random() * limit) + 1;
-  const b = Math.floor(random() * 9) + 1;
-  const operator = settings.variant === 'multiply' ? pick(['×', '÷'], random) : pick(['+', '−'], random);
-  const left = operator === '÷' ? a * b : a;
-  const result = operator === '÷' ? a : operator === '×' ? a * b : operator === '+' ? a + b : a - b;
-  const options = shuffle([result, result + 1, result - 1, result + 2], random);
-  return { stimulus: `${left} ${operator} ${b}`, options: options.map(String), answer: options.indexOf(result), group: operator };
+  const integer = (min, max) => min + Math.floor(random() * (max - min + 1));
+  let a; let b; let c; let operator;
+  if (settings.variant === 'multiply') {
+    const type = random();
+    a = type < 0.5 ? integer(2, 9) : type < 0.8 ? integer(5, 14) : integer(2, 7);
+    b = type < 0.5 ? integer(2, 9) : type < 0.8 ? integer(2, 6) : integer(2, 7);
+    c = type >= 0.8 ? integer(1, 20) : 0;
+    operator = '×';
+  } else {
+    operator = random() < 0.5 ? '+' : '−';
+    a = settings.variant === 'two-digit' ? integer(operator === '+' ? 10 : 20, operator === '+' ? 89 : 99) : integer(operator === '+' ? 1 : 5, operator === '+' ? 9 : 19);
+    b = settings.variant === 'two-digit' ? integer(operator === '+' ? 10 : 5, operator === '+' ? 89 : a - 6) : integer(1, operator === '+' ? 9 : a - 1);
+    c = 0;
+  }
+  const result = operator === '×' ? a * b + c : operator === '+' ? a + b : a - b;
+  const distractors = shuffle(Array.from({ length: 11 }, (_, i) => result + i - 5).filter((value) => value >= 0 && value !== result), random).slice(0, 3);
+  const options = shuffle([result, ...distractors], random);
+  return { stimulus: `${a} ${operator} ${b}${c ? ` + ${c}` : ''}`, options: options.map(String), answer: options.indexOf(result), group: operator };
 }
 
 export function flankerSchedule(random = Math.random) {
@@ -114,7 +126,10 @@ export function mountChoices({ root, mode, preset, settings, onFinish, random = 
     if (challenge) Object.assign(metrics, challenge, { challenge: challenge.achieved ? '达标' : '未达标' });
     const score = kind === 'number-comparison' ? metrics.correct : kind === 'posner-cue' ? metrics.meanMs : values.penalty ? (metrics.meanMs === null ? null : Math.round(metrics.meanMs + metrics.errors * values.penalty) / 1000) : scoredTrials.length ? Math.round(metrics.correct / scoredTrials.length * 100) : null;
     const accuracy = scoredTrials.length ? metrics.correct / scoredTrials.length : 0;
-    const unlocks = challenge?.achieved ? [`number-comparison|level|${challenge.level + 1}`] : kind === 'stroop' && mode.id === 'ink' && preset.id === '3' && accuracy >= 0.85 ? ['stroop|ink|4'] : kind === 'stroop' && mode.id === 'ink' && preset.id === '4' && accuracy >= 0.9 ? ['stroop|ink|5', 'stroop|ink|reverse'] : [];
+    const thresholds = { flanker: ['3', '5', '7', 0.9, 0.85], simon: ['slow', 'standard', 'fast', 0.9, 0.85], 'task-switching': ['alternate', 'random', 'pressure', 0.85, 0.9], math: ['single', 'two-digit', 'multiply', 0.8, 0.85] }[kind];
+    const next = thresholds && preset.id === thresholds[0] && accuracy >= thresholds[3] ? thresholds[1] : thresholds && preset.id === thresholds[1] && accuracy >= thresholds[4] ? thresholds[2] : null;
+    const cueNext = kind === 'posner-cue' && metrics.meanMs > 0 && preset.id === '80' && metrics.meanMs <= 400 ? '70' : kind === 'posner-cue' && metrics.meanMs > 0 && preset.id === '70' && metrics.meanMs <= 350 ? '50' : null;
+    const unlocks = challenge?.achieved ? [`number-comparison|level|${challenge.level + 1}`] : next ? [`${kind}|${mode.id}|${next}`] : cueNext ? [`posner-cue|cue|${cueNext}`] : kind === 'stroop' && mode.id === 'ink' && preset.id === '3' && accuracy >= 0.85 ? ['stroop|ink|4'] : kind === 'stroop' && mode.id === 'ink' && preset.id === '4' && accuracy >= 0.9 ? ['stroop|ink|5', 'stroop|ink|reverse'] : [];
     runtime.finish({ value: score, detail: `${scoredTrials.length} 题中答对 ${metrics.correct} 题`, mode: mode.id, preset: preset.id, settings: values, rules: mode.ruleVersion, input: inputs.value, endReason: values.duration ? 'timeout' : 'completed', scored: score !== null, metrics, trials, unlocks });
   };
   const advance = () => {
@@ -135,7 +150,10 @@ export function mountChoices({ root, mode, preset, settings, onFinish, random = 
     });
     if (current.cue) {
       root.innerHTML = `<div class="stimulus fixation">${current.cue}</div>`;
-      runtime.later(show, 300);
+      runtime.later(() => {
+        root.innerHTML = '<div class="stimulus fixation">+</div>';
+        runtime.later(show, 200);
+      }, 300);
     } else if (values.fixation) {
       root.innerHTML = '<div class="stimulus fixation">+</div>';
       runtime.later(show, values.fixation);
@@ -149,9 +167,10 @@ export function mountChoices({ root, mode, preset, settings, onFinish, random = 
     if (input !== 'any') inputs.add(input);
     const correct = answer === current.answer;
     trials.push({ group: current.group, correct, responseMs: answer === null ? null : Math.max(0, at - shownAt), answer, target: current.answer, practice: trials.length < (values.practice ?? 0) });
-    if (values.feedback) {
+    const feedback = kind === 'posner-cue' ? (answer === null ? 0 : 400) : kind === 'math' ? (correct ? 400 : 900) : values.feedback;
+    if (feedback) {
       root.innerHTML = `<div class="stimulus">${answer === null ? '未响应' : correct ? '正确' : '错误'}</div>`;
-      runtime.later(advance, values.feedback);
+      runtime.later(advance, feedback);
     } else advance();
   };
   runtime.listen(root, 'click', (event) => {
