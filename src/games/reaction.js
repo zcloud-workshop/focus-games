@@ -1,4 +1,4 @@
-import { createRuntime, inputTime } from '../engines/runtime.js';
+import { createRuntime, inputMethod, inputTime, trackInputs } from '../engines/runtime.js';
 import { meanValidResponses, presentOnFrame } from '../engines/trials.js';
 import { markUnlocked } from '../storage.js';
 
@@ -28,7 +28,7 @@ export function mount({ root, mode = definition.modes[0], preset = mode.presets[
   let shownAt;
   let lights = 0;
   let early = 0;
-  const inputs = new Set();
+  let inputs = trackInputs();
   const lightMode = mode.id === 'start-lights';
   const staged = mode.id === 'staged';
   const single = mode.id === 'single';
@@ -65,8 +65,8 @@ export function mount({ root, mode = definition.modes[0], preset = mode.presets[
   };
   const respond = (event, input) => {
     if (phase === 'feedback') { if (continuous) begin(); return; }
-    inputs.add(input);
     if (phase === 'idle') { begin(); return; }
+    inputs.add(input);
     const at = inputTime(event, runtime.now);
     const responseMs = phase === 'ready' ? Math.max(0, at - shownAt) : null;
     if (phase === 'waiting' || (lightMode && responseMs < 100)) {
@@ -92,7 +92,7 @@ export function mount({ root, mode = definition.modes[0], preset = mode.presets[
       }
     }
     if (!continuous && valid().length === 5) {
-      runtime.finish({ value: Math.round((lightMode ? average / 1000 : average) * 1000) / 1000, detail: `${valid().length} 次有效反应的平均值, 抢按 ${early} 次`, mode: mode.id, preset: preset.id, settings, rules: mode.ruleVersion, input: inputs.size === 1 ? [...inputs][0] : 'mixed', endReason: 'completed', scored: true, metrics: { early, averageMs: average }, trials });
+      runtime.finish({ value: Math.round((lightMode ? average / 1000 : average) * 1000) / 1000, detail: `${valid().length} 次有效反应的平均值, 抢按 ${early} 次`, mode: mode.id, preset: preset.id, settings, rules: mode.ruleVersion, input: inputs.value, endReason: 'completed', scored: true, metrics: { early, averageMs: average }, trials });
       return;
     }
     draw(single ? `${(responseMs / 1000).toFixed(3)} 秒` : `${Math.round(responseMs)} ms`, continuous ? '点击继续, 或完成并保存' : '准备下一次');
@@ -101,24 +101,24 @@ export function mount({ root, mode = definition.modes[0], preset = mode.presets[
   runtime.listen(root, 'click', (event) => {
     if (event.target.closest('[data-reset]')) {
       runtime.cancel(timer);
-      trials.length = 0; early = 0; inputs.clear(); phase = 'idle';
+      trials.length = 0; early = 0; inputs = trackInputs(); phase = 'idle';
       draw('点击开始', '等待信号后再响应');
     }
     if (event.target.closest('[data-finish]') && valid().length) {
       const average = meanValidResponses(trials);
       const value = single ? valid().at(-1).responseMs / 1000 : average;
-      runtime.finish({ value: Math.round(value * 1000) / 1000, detail: single ? `最近一次反应, 本次共 ${valid().length} 次有效测量` : `${valid().length} 次有效反应的平均值, 抢按 ${early} 次`, mode: mode.id, preset: preset.id, settings, rules: mode.ruleVersion, input: inputs.size === 1 ? [...inputs][0] : 'mixed', endReason: 'completed', scored: true, metrics: { early, averageMs: average }, trials, unlocks: [...unlocks] });
+      runtime.finish({ value: Math.round(value * 1000) / 1000, detail: single ? `最近一次反应, 本次共 ${valid().length} 次有效测量` : `${valid().length} 次有效反应的平均值, 抢按 ${early} 次`, mode: mode.id, preset: preset.id, settings, rules: mode.ruleVersion, input: inputs.value, endReason: 'completed', scored: true, metrics: { early, averageMs: average }, trials, unlocks: [...unlocks] });
     }
   });
   runtime.listen(root, 'pointerdown', (event) => {
     if (!event.target.closest('[data-react]') || event.button !== 0) return;
     event.preventDefault();
-    respond(event, event.pointerType === 'touch' ? 'touch' : 'pointer');
+    respond(event, inputMethod(event));
   });
   runtime.listen(document, 'keydown', (event) => {
     if (event.code !== 'Space' || event.repeat || event.ctrlKey || event.metaKey || event.altKey) return;
     event.preventDefault();
-    respond(event, 'keyboard');
+    respond(event, inputMethod(event));
   });
   draw('点击开始', '等待信号后再响应');
   return runtime.cleanup;
