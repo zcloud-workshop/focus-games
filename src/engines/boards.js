@@ -160,3 +160,11 @@ export function createLights(min, max, random = Math.random) {
 export function matchingPositions(left, right) {
   return left.reduce((count, value, index) => count + Number(value === right[index]), 0);
 }
+
+export function swapAdjacent(order, index, direction) {
+  const other = index + direction;
+  if (other < 0 || other >= order.length) return null;
+  const next = [...order];
+  [next[index], next[other]] = [next[other], next[index]];
+  return next;
+}
