@@ -105,3 +105,54 @@ export function moveMaze(maze, position, direction) {
   const next = nextRow * maze.size + nextCol;
   return maze.cells[next] ? next : position;
 }
+
+export function toggleLights(board, index, size = 5) {
+  const next = [...board];
+  const row = Math.floor(index / size);
+  const col = index % size;
+  for (const [dr, dc] of [[0, 0], [-1, 0], [1, 0], [0, -1], [0, 1]]) {
+    const r = row + dr;
+    const c = col + dc;
+    if (r >= 0 && c >= 0 && r < size && c < size) next[r * size + c] = !next[r * size + c];
+  }
+  return next;
+}
+
+export function solveLights(board, size = 5) {
+  let best = null;
+  for (let first = 0; first < 2 ** size; first++) {
+    let state = [...board];
+    const moves = [];
+    for (let col = 0; col < size; col++) {
+      if (first & (1 << col)) { state = toggleLights(state, col, size); moves.push(col); }
+    }
+    for (let row = 1; row < size; row++) {
+      for (let col = 0; col < size; col++) {
+        if (state[(row - 1) * size + col]) {
+          const index = row * size + col;
+          state = toggleLights(state, index, size);
+          moves.push(index);
+        }
+      }
+    }
+    if (!state.some(Boolean) && (!best || moves.length < best.length)) best = moves;
+  }
+  return best;
+}
+
+export function createLights(min, max, random = Math.random) {
+  const size = 5;
+  for (let attempt = 0; attempt < 2000; attempt++) {
+    const positions = Array.from({ length: size * size }, (_, index) => index);
+    for (let i = positions.length - 1; i > 0; i--) {
+      const j = Math.floor(random() * (i + 1));
+      [positions[i], positions[j]] = [positions[j], positions[i]];
+    }
+    const count = min + Math.floor(random() * (max - min + 1));
+    let board = Array(size * size).fill(false);
+    positions.slice(0, count).forEach((index) => { board = toggleLights(board, index, size); });
+    const solution = solveLights(board, size);
+    if (solution && solution.length >= min && solution.length <= max) return { board, solution };
+  }
+  throw new Error('未能生成符合难度的灯阵.');
+}
