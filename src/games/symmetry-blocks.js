@@ -1,4 +1,5 @@
 import { mirrorGrid } from '../engines/transforms.js';
+import { bindBoardButtons, trackInputs } from '../engines/board-input.js';
 
 export const definition = {
   id: 'symmetry-blocks',
@@ -6,7 +7,7 @@ export const definition = {
     id: 'timed', name: '对称方块', ruleVersion: 2,
     presets: [{ id: 'standard', name: '180 秒', settings: {} }],
     score: { unit: '分', lower: false, min: -1000000 }, hiddenPolicy: 'invalidate',
-    inputs: ['pointer'], rule: '在右侧复刻左侧图案的镜像, 提交后判断.'
+    inputs: ['pointer', 'touch', 'keyboard', 'mixed'], rule: '在右侧复刻左侧图案的镜像, 提交后判断.'
   }]
 };
 
@@ -20,6 +21,7 @@ export function mount({ root, mode, preset, settings, onFinish, random = Math.ra
   let correct = 0;
   let wrong = 0;
   let active = true;
+  const inputs = trackInputs();
   let timer;
   const cleanup = () => { active = false; controller.abort(); clock.clearTimeout(timer); };
   const next = () => {
@@ -41,19 +43,19 @@ export function mount({ root, mode, preset, settings, onFinish, random = Math.ra
     if (!remaining) {
       const duration = (clock.performance.now() - started) / 1000;
       cleanup();
-      onFinish({ value: score, detail: `答对 ${correct} 题, 答错 ${wrong} 题`, duration, mode: mode.id, preset: preset.id, settings, rules: mode.ruleVersion, input: 'pointer', endReason: 'timeout', scored: true, metrics: { correct, wrong }, trials: [] });
+      onFinish({ value: score, detail: `答对 ${correct} 题, 答错 ${wrong} 题`, duration, mode: mode.id, preset: preset.id, settings, rules: mode.ruleVersion, input: inputs.value, endReason: 'timeout', scored: true, metrics: { correct, wrong }, trials: [] });
     } else timer = clock.setTimeout(tick, Math.min(100, remaining));
   };
-  root.addEventListener('click', (event) => {
-    if (!active || clock.performance.now() >= deadline) return;
-    const cell = event.target.closest('button[data-index]');
-    if (cell) { const index = Number(cell.dataset.index); selected[index] = !selected[index]; draw(); return; }
-    if (event.target.closest('button[data-submit]')) {
+  bindBoardButtons(root, 'button[data-index], button[data-submit]', (button, input, at) => {
+    if (!active || at >= deadline) return;
+    inputs.add(input);
+    if ('index' in button.dataset) { const index = Number(button.dataset.index); selected[index] = !selected[index]; draw(); return; }
+    if ('submit' in button.dataset) {
       if (mirrorGrid(source, 3).every((value, index) => value === selected[index])) { score++; correct++; }
       else { score--; wrong++; }
       next();
     }
-  }, { signal: controller.signal });
+  }, controller.signal, () => clock.performance.now());
   next();
   tick();
   return cleanup;
