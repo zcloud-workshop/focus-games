@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mirrorGrid, reflectShape, rotateShape, rotationsMatch } from '../src/engines/transforms.js';
+import { mirrorGrid, reflectShape, rotateShape, rotationQuestion, rotationShape, rotationsMatch } from '../src/engines/transforms.js';
 import { numberMirrorTrial } from '../src/games/number-mirror.js';
 
 test('镜像逐行左右翻转, 两次镜像还原', () => {
@@ -21,4 +21,30 @@ test('非对称形状的旋转不改变手性, 镜像不等价于旋转', () => 
     assert.equal(rotationsMatch(shape, rotateShape(reflectShape(shape), turns)), false);
   }
   assert.equal(rotationsMatch(shape, reflectShape(reflectShape(shape))), true);
+});
+
+test('心理旋转每题恰有一个旋转而非镜像选项', () => {
+  const shapes = [
+    [[0, 0], [1, 0], [2, 0], [0, 1], [1, 2]],
+    [[0, 0], [1, 0], [2, 0], [0, 1], [1, 1], [1, 2], [2, 2]],
+    [[0, 0], [1, 0], [2, 0], [3, 0], [0, 1], [1, 1], [0, 2], [2, 3]],
+  ];
+  for (const shape of shapes) {
+    const question = rotationQuestion(shape, () => 0.42);
+    assert.equal(new Set(question.choices.map(JSON.stringify)).size, 4);
+    assert.deepEqual(question.choices.map((choice) => rotationsMatch(shape, choice)), question.choices.map((_, i) => i === question.answer));
+  }
+});
+
+test('随机生成的旋转图形具备不同手性与四种不同朝向', () => {
+  let state = 42;
+  const random = () => { state = (state * 1664525 + 1013904223) >>> 0; return state / 2 ** 32; };
+  for (const [size, count] of [[3, 5], [3, 7], [4, 8]]) {
+    for (let i = 0; i < 10; i++) {
+      const shape = rotationShape(size, count, random);
+      assert.equal(shape.length, count);
+      assert.equal(new Set([0, 1, 2, 3].map((turns) => JSON.stringify(rotateShape(shape, turns)))).size, 4);
+      assert.equal(rotationsMatch(shape, reflectShape(shape)), false);
+    }
+  }
 });
