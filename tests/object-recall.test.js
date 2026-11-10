@@ -18,3 +18,8 @@ test('自由回忆不计重复, 支持别名并忽略空白及错误', () => {
   assert.deepEqual(scoreRecall(selected, [' 书本 ', '书', '杯', '杯子', '', '错误']), ['书', '杯子']);
   assert.deepEqual(scoreRecall(selected, ['', '错误']), []);
 });
+
+test('来源支持去空格后的部分名称, 每个物品最多计一次', () => {
+  const selected = [{ name: '相机', aliases: [] }, { name: '杯子', aliases: [] }];
+  assert.deepEqual(scoreRecall(selected, ['相 机', '相', '杯']), ['相机', '杯子']);
+});
