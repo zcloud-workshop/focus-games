@@ -1,6 +1,5 @@
 import { createRuntime, inputMethod, inputTime, trackInputs } from './runtime.js';
 import { presentOnFrame } from './trials.js';
-import { shuffle } from '../core.js';
 
 export function inhibitionSummary(trials) {
   const go = trials.filter((trial) => !trial.stop);
@@ -15,12 +14,20 @@ export function inhibitionSummary(trials) {
   };
 }
 
+export function inhibitionUnlock(kind, preset, metrics) {
+  if (!metrics.stopTotal) return [];
+  const percent = metrics.stopCorrect / metrics.stopTotal * 100;
+  if (kind === 'gonogo' && preset.id === 'beginner' && percent >= 85) return ['gonogo|signals|standard'];
+  if (kind === 'gonogo' && preset.id === 'standard' && percent >= 90) return ['gonogo|signals|fast'];
+  if (kind === 'stop-signal' && preset.id === 'beginner' && percent >= 80) return ['stop-signal|stop|standard'];
+  if (kind === 'stop-signal' && preset.id === 'standard' && percent >= 75) return ['stop-signal|stop|fast'];
+  return [];
+}
+
 export function mountInhibition({ root, mode, preset, settings, onFinish, random = Math.random, clock = globalThis, kind }) {
   const runtime = createRuntime({ onFinish, clock });
   const values = { ...preset.settings, ...settings };
   const trials = [];
-  const stopCount = Math.round(values.count * values.stopRate / 100);
-  const schedule = shuffle([...Array(stopCount).fill(true), ...Array(values.count - stopCount).fill(false)], random);
   const inputs = trackInputs();
   let current;
   let shownAt;
@@ -30,13 +37,13 @@ export function mountInhibition({ root, mode, preset, settings, onFinish, random
     if (trials.length >= values.count) {
       const metrics = inhibitionSummary(trials);
       const correct = metrics.goCorrect + metrics.stopCorrect;
-      const value = kind === 'sart' ? correct / trials.length : metrics.stopCorrect / metrics.stopTotal;
-      runtime.finish({ value: Math.round(value * 100), detail: `${trials.length} 次中正确 ${correct} 次`, mode: mode.id, preset: preset.id, settings: values, rules: mode.ruleVersion, input: inputs.value, endReason: 'completed', scored: true, metrics, trials });
+      const value = kind === 'sart' ? correct / trials.length : metrics.stopTotal ? metrics.stopCorrect / metrics.stopTotal : null;
+      runtime.finish({ value: value === null ? null : Math.round(value * 100), detail: `${trials.length} 次中正确 ${correct} 次`, mode: mode.id, preset: preset.id, settings: values, rules: mode.ruleVersion, input: inputs.value, endReason: 'completed', scored: value !== null, metrics, trials, unlocks: inhibitionUnlock(kind, preset, metrics) });
       return;
     }
     waiting = true;
     accepted = false;
-    const stop = schedule[trials.length];
+    const stop = random() < values.stopRate / 100;
     const direction = random() < 0.5 ? 'left' : 'right';
     const digit = stop ? 3 : [1, 2, 4, 5, 6, 7, 8, 9][Math.floor(random() * 8)];
     current = { stop, direction, response: null, responseMs: null, signalAt: null, correct: false };
