@@ -10,15 +10,15 @@ const shapes = {
 export const definition = {
   id: 'mental-rotation',
   modes: [{
-    id: 'rotate', name: '心理旋转', ruleVersion: 2,
+    id: 'rotate', name: '心理旋转', ruleVersion: 3,
     presets: [
       { id: 'simple', name: '3 × 3', settings: { shape: 'simple', rounds: 15 } },
-      { id: 'complex', name: '3 × 3 复杂', settings: { shape: 'complex', rounds: 15 } },
-      { id: 'large', name: '4 × 4', settings: { shape: 'large', rounds: 15 } },
-    ],
-    fields: [
-      { key: 'rounds', label: '题数', type: 'number', default: 15, min: 5, max: 40, step: 1 },
-      { key: 'shape', label: '图形', type: 'select', default: 'simple', options: [{ value: 'simple', label: '3 × 3' }, { value: 'complex', label: '3 × 3 复杂' }, { value: 'large', label: '4 × 4' }] },
+      { id: 'complex', name: '3 × 3 复杂', settings: { shape: 'complex', rounds: 15 }, unlock: { requires: ['mental-rotation|rotate|complex'] } },
+      { id: 'large', name: '4 × 4', settings: { shape: 'large', rounds: 15 }, unlock: { requires: ['mental-rotation|rotate|large'] } },
+      { id: 'custom', name: '自定义', settings: { shape: 'simple', rounds: 15 }, unlock: { requires: ['mental-rotation|rotate|complex'] }, fields: [
+        { key: 'rounds', label: '题数', type: 'number', default: 15, min: 5, max: 40, step: 1 },
+        { key: 'shape', label: '图形', type: 'select', default: 'simple', options: [{ value: 'simple', label: '3 × 3' }, { value: 'complex', label: '3 × 3 复杂' }, { value: 'large', label: '4 × 4' }] },
+      ] },
     ],
     score: { unit: '%', lower: false, min: 0, max: 100 }, hiddenPolicy: 'invalidate',
     inputs: ['pointer', 'touch', 'keyboard', 'mixed'], rule: '选择能由上方图形旋转得到的图形, 镜像不能通过旋转重合.'
@@ -48,8 +48,10 @@ export function mount({ root, mode, preset, settings, onFinish, random = Math.ra
     round++;
     if (round < settings.rounds) { draw(); return; }
     const duration = Math.max(0, at - started) / 1000;
+    const unlocks = preset.id === 'simple' && correct / round >= 0.8 ? ['mental-rotation|rotate|complex']
+      : preset.id === 'complex' && correct / round >= 0.85 ? ['mental-rotation|rotate|large'] : [];
     cleanup();
-    onFinish({ value: Math.round(correct / round * 100), detail: `${round} 题中答对 ${correct} 题`, duration, mode: mode.id, preset: preset.id, settings, rules: mode.ruleVersion, input: inputs.value, endReason: 'complete', scored: true, metrics: { correct, rounds: round }, trials: [] });
+    onFinish({ value: Math.round(correct / round * 100), detail: `${round} 题中答对 ${correct} 题`, duration, mode: mode.id, preset: preset.id, settings, rules: mode.ruleVersion, input: inputs.value, endReason: 'complete', scored: true, metrics: { correct, rounds: round }, trials: [], unlocks });
   }, controller.signal, () => clock.performance.now());
   draw();
   return cleanup;
