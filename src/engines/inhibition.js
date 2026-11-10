@@ -49,7 +49,7 @@ export function mountInhibition({ root, mode, preset, settings, onFinish, random
       if (kind === 'stop-signal' && stop) runtime.later(() => {
         current.signalAt = runtime.now() - shownAt;
         root.querySelector('#inhibition-stimulus').style.boxShadow = 'inset 0 0 0 5px #c44343';
-      }, values.delay);
+      }, values.delayMin + random() * (values.delayMax - values.delayMin));
       runtime.later(() => {
         current.correct = current.stop ? current.response === null : kind === 'stop-signal' ? current.response === current.direction : current.response !== null;
         trials.push(current);
