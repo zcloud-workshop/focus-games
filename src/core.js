@@ -1,9 +1,9 @@
 export const categories = [
-  { id: 'all', name: '全部训练' },
-  { id: 'attention', name: '视觉与注意' },
-  { id: 'memory', name: '工作记忆' },
-  { id: 'control', name: '反应与控制' },
-  { id: 'relax', name: '感知与放松' },
+  { id: 'all', name: '全部' },
+  { id: 'attention', name: '视觉' },
+  { id: 'memory', name: '记忆' },
+  { id: 'control', name: '反应' },
+  { id: 'relax', name: '放松' },
 ];
 
 export const games = [
