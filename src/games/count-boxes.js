@@ -31,7 +31,7 @@ export function createBoxScene(level, random = Math.random) {
 }
 
 export function boxProjection(heights) {
-  return heights.flatMap((height, stack) => Array.from({ length: height }, (_, z) => ({ x: 4 + stack * 32, y: 75 - z * 20 })));
+  return heights.flatMap((height, stack) => Array.from({ length: height }, (_, z) => ({ x: 4 + stack * 32, y: 75 - z * 15 })));
 }
 
 function sceneSvg(heights) {
