@@ -10,12 +10,13 @@ export const choiceFields = {
   window: { key: 'window', label: '响应窗', type: 'number', default: 2000, min: 300, max: 10000, step: 100, unit: '毫秒' },
   colors: { key: 'colors', label: '颜色数', type: 'number', default: 3, min: 3, max: 6, step: 1 },
   arrows: { key: 'arrows', label: '箭头数', type: 'select', default: 5, options: [3, 5, 7].map((value) => ({ value, label: String(value) })) },
+  conflictRate: { key: 'conflictRate', label: '冲突比例', type: 'number', default: 50, min: 0, max: 100, step: 5, unit: '%' },
   validRate: { key: 'validRate', label: '有效线索', type: 'number', default: 80, min: 10, max: 90, step: 5, unit: '%' },
 };
 
 export function choiceTrial(kind, settings, random = Math.random, index = 0, previousRule, target) {
   const direction = target?.direction ?? (random() < 0.5 ? 0 : 1);
-  const conflict = random() < (kind === 'posner-cue' ? 1 - (settings.validRate ?? 80) / 100 : kind === 'stroop' ? 1 - (settings.congruentRate ?? 50) / 100 : 0.5);
+  const conflict = random() < (kind === 'posner-cue' ? 1 - (settings.validRate ?? 80) / 100 : kind === 'stroop' ? 1 - (settings.congruentRate ?? 50) / 100 : kind === 'flanker' ? (settings.conflictRate ?? 50) / 100 : 0.5);
   if (kind === 'flanker') {
     const group = target?.group ?? (settings.neutral && random() < 1 / 3 ? 'neutral' : conflict ? 'conflict' : 'congruent');
     const center = direction ? '→' : '←';
@@ -107,7 +108,8 @@ export function mountChoices({ root, mode, preset, settings, onFinish, random = 
       metrics.challenge = scoredTrials.length >= 25 && metrics.accuracy >= 90 ? '达标' : '未达标';
     }
     const score = kind === 'number-comparison' ? metrics.correct : kind === 'posner-cue' ? metrics.meanMs : values.penalty ? (metrics.meanMs === null ? null : Math.round(metrics.meanMs + metrics.errors * values.penalty) / 1000) : scoredTrials.length ? Math.round(metrics.correct / scoredTrials.length * 100) : null;
-    runtime.finish({ value: score, detail: `${scoredTrials.length} 题中答对 ${metrics.correct} 题`, mode: mode.id, preset: preset.id, settings: values, rules: mode.ruleVersion, input: inputs.value, endReason: values.duration ? 'timeout' : 'completed', scored: score !== null, metrics, trials });
+    const unlocks = kind === 'stroop' && mode.id === 'ink' && scoredTrials.length && metrics.correct / scoredTrials.length >= 0.9 ? ['stroop|ink|reverse'] : [];
+    runtime.finish({ value: score, detail: `${scoredTrials.length} 题中答对 ${metrics.correct} 题`, mode: mode.id, preset: preset.id, settings: values, rules: mode.ruleVersion, input: inputs.value, endReason: values.duration ? 'timeout' : 'completed', scored: score !== null, metrics, trials, unlocks });
   };
   const advance = () => {
     if (runtime.now() >= deadline || (values.count && trials.length >= values.count + (values.practice ?? 0))) { finish(); return; }
