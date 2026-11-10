@@ -70,6 +70,7 @@ export function mount({ root, mode, preset, settings, onFinish, random = Math.ra
         root.querySelector('input').focus();
       };
       if (scene.moving) {
+        root.querySelector('[data-scene] svg').style.transform = 'translateX(-100%)';
         const animate = () => {
           if (!active) return;
           const progress = Math.min(1, (clock.performance.now() - displayedAt) / 3000);
