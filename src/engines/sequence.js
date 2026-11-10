@@ -1,4 +1,5 @@
 import { shuffle } from '../core.js';
+import { presentOnFrame } from './trials.js';
 
 export function randomDigits(length, random = Math.random) {
   return Array.from({ length }, () => Math.floor(random() * 10)).join('');
@@ -28,4 +29,12 @@ export function makePath(size, length, random = Math.random, startPosition) {
     steps.push(label);
   }
   return { start, steps, end: position };
+}
+
+export function presentTimed(runtime, render, duration, clear, callback) {
+  presentOnFrame(runtime, render, (shownAt) => {
+    runtime.later(() => presentOnFrame(runtime, clear, (hiddenAt) => {
+      callback({ presentedAt: shownAt, durationMs: hiddenAt - shownAt });
+    }), duration);
+  });
 }
