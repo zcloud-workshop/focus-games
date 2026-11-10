@@ -1,0 +1,4 @@
+import { mountTimed } from '../engines/nback.js';
+const presets = [{ id: 'slow', name: '1-Back 慢速', settings: { n: 1, count: 20, interval: 3000 } }, { id: 'fast', name: '1-Back 快速', settings: { n: 1, count: 20, interval: 1800 } }, { id: 'two', name: '2-Back', settings: { n: 2, count: 20, interval: 2500 } }];
+export const definition = { id: 'auditory-attention', modes: [{ id: 'pitch', name: '音调回溯', ruleVersion: 2, presets, fields: [{ key: 'n', label: '回溯步数', type: 'number', default: 1, min: 1, max: 5, step: 1 }, { key: 'interval', label: '音调间隔', type: 'number', default: 2500, min: 1000, max: 5000, step: 250, unit: '毫秒' }], score: { unit: '%', lower: false, min: 0, max: 100 }, hiddenPolicy: 'invalidate', inputs: ['pointer', 'touch', 'keyboard'], rule: '判断当前音调是否与 N 步前相同.' }] };
+export function mount(options) { return mountTimed({ ...options, kind: 'tone' }); }
