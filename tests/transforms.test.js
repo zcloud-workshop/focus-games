@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mirrorGrid, reflectShape, rotateShape, rotationQuestion, rotationShape, rotationsMatch, unfoldHole } from '../src/engines/transforms.js';
+import { matrixQuestion, mirrorGrid, reflectShape, rotateShape, rotationQuestion, rotationShape, rotationsMatch, unfoldHole } from '../src/engines/transforms.js';
 import { numberMirrorTrial } from '../src/games/number-mirror.js';
 import { foldingQuestion } from '../src/games/paper-folding.js';
 
@@ -57,5 +57,23 @@ test('折纸按折叠逆序展开, 题目选项唯一', () => {
     const question = foldingQuestion(count, () => 0.37);
     assert.equal(new Set(question.choices.map(JSON.stringify)).size, 4);
     assert.deepEqual(question.choices[question.answer], unfoldHole(question.hole, folds.slice(0, count)));
+  }
+});
+
+test('矩阵各属性在每行每列各出现一次, 只有一个选项满足缺格', () => {
+  let state = 42;
+  const random = () => { state = (state * 1664525 + 1013904223) >>> 0; return state / 2 ** 32; };
+  for (const [attributes, complex] of [[2, false], [3, false], [3, true]]) {
+    for (let sample = 0; sample < 10; sample++) {
+      const question = matrixQuestion(attributes, complex, random);
+      assert.equal(new Set(question.choices.map(JSON.stringify)).size, 4);
+      for (let attribute = 0; attribute < attributes; attribute++) {
+        for (let i = 0; i < 3; i++) {
+          assert.equal(new Set([0, 1, 2].map((j) => question.cells[i * 3 + j][attribute])).size, 3);
+          assert.equal(new Set([0, 1, 2].map((j) => question.cells[j * 3 + i][attribute])).size, 3);
+        }
+      }
+      assert.deepEqual(question.choices[question.answer], question.cells[8]);
+    }
   }
 });
