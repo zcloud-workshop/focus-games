@@ -10,7 +10,7 @@ export function makeCard(random = Math.random) {
 }
 export function matchCard(card, rule, option) { return card[rule] === option; }
 
-export const definition = { id: 'card-sorting', modes: [{ id: 'hidden-rule', name: '发现分类规则', ruleVersion: 2, presets: [30, 40, 60].map((count) => ({ id: String(count), name: `${count} 题`, settings: { count, streak: 10 } })), score: { unit: '%', lower: false, min: 0, max: 100 }, hiddenPolicy: 'invalidate', inputs: ['pointer', 'keyboard'], rule: '根据对错反馈发现卡片的匹配规则. 规则会在练习中改变.' }] };
+export const definition = { id: 'card-sorting', modes: [{ id: 'hidden-rule', name: '发现分类规则', ruleVersion: 2, presets: [30, 40, 60].map((count) => ({ id: String(count), name: `${count} 题`, settings: { count, streak: 10 } })), score: { unit: '%', lower: false, min: 0, max: 100 }, hiddenPolicy: 'invalidate', inputs: ['pointer', 'touch', 'keyboard'], rule: '根据对错反馈发现卡片的匹配规则. 规则会在练习中改变.' }] };
 
 export function mount({ root, mode = definition.modes[0], preset = mode.presets[0], settings = preset.settings, onFinish, random = Math.random, clock = globalThis }) {
   const runtime = createRuntime({ onFinish, clock });
