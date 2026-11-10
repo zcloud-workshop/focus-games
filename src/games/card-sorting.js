@@ -14,7 +14,7 @@ export function nextCardRule(index, random = Math.random) {
   return choices[Math.floor(random() * choices.length)];
 }
 
-export const definition = { id: 'card-sorting', modes: [{ id: 'hidden-rule', name: '发现分类规则', ruleVersion: 3, presets: [30, 40, 60].map((count) => ({ id: String(count), name: `${count} 题`, settings: { count, streak: 5 } })).concat({ id: 'custom', name: '自定义', settings: { count: 40, streak: 5 }, fields: [{ key: 'count', label: '题数', type: 'number', default: 40, min: 10, max: 100, step: 1 }] }), score: { unit: '组', lower: false, min: 0 }, hiddenPolicy: 'invalidate', inputs: ['pointer', 'touch', 'keyboard'], rule: '根据对错反馈发现卡片的匹配规则. 规则会在练习中改变.' }] };
+export const definition = { id: 'card-sorting', modes: [{ id: 'hidden-rule', name: '发现分类规则', ruleVersion: 4, presets: [30, 40, 60].map((count) => ({ id: String(count), name: `${count} 题`, settings: { count, streak: 5 }, ...(count > 30 ? { unlock: { requires: [`card-sorting|hidden-rule|${count}`] } } : {}) })).concat({ id: 'custom', name: '自定义', settings: { count: 30, streak: 5 }, unlock: { requires: ['card-sorting|hidden-rule|40'] }, fields: [{ key: 'count', label: '题数', type: 'number', default: 30, min: 20, max: 30, step: 10, maxByUnlock: [{ key: 'card-sorting|hidden-rule|40', max: 40 }, { key: 'card-sorting|hidden-rule|60', max: 60 }] }] }), score: { unit: '组', lower: false, min: 0 }, hiddenPolicy: 'invalidate', inputs: ['pointer', 'touch', 'keyboard'], rule: '根据对错反馈发现卡片的匹配规则. 规则会在练习中改变.' }] };
 
 export function mount({ root, mode = definition.modes[0], preset = mode.presets[0], settings = preset.settings, onFinish, random = Math.random, clock = globalThis }) {
   const runtime = createRuntime({ onFinish, clock });
@@ -22,7 +22,7 @@ export function mount({ root, mode = definition.modes[0], preset = mode.presets[
   const trials = [];
   const inputs = trackInputs();
   let current;
-  let ruleIndex = 0;
+  let ruleIndex = Math.floor(random() * rules.length);
   let previousRule = null;
   let streak = 0;
   let categories = 0;
@@ -32,7 +32,8 @@ export function mount({ root, mode = definition.modes[0], preset = mode.presets[
   const show = () => {
     if (trials.length === values.count) {
       const correct = trials.filter((trial) => trial.correct).length;
-      runtime.finish({ value: categories, detail: `${trials.length} 题中答对 ${correct} 题, 完成 ${categories} 组分类`, mode: mode.id, preset: preset.id, settings: values, rules: mode.ruleVersion, input: inputs.value, endReason: 'completed', scored: true, metrics: { correct, errors: trials.length - correct, categories, perseverativeErrors: trials.filter((trial) => trial.perseverative).length }, trials });
+      const next = preset.id === '30' && categories >= 2 ? '40' : preset.id === '40' && categories >= 3 ? '60' : null;
+      runtime.finish({ value: categories, detail: `${trials.length} 题中答对 ${correct} 题, 完成 ${categories} 组分类`, mode: mode.id, preset: preset.id, settings: values, rules: mode.ruleVersion, input: inputs.value, endReason: 'completed', scored: true, metrics: { correct, errors: trials.length - correct, categories, perseverativeErrors: trials.filter((trial) => trial.perseverative).length }, trials, unlocks: next ? [`card-sorting|hidden-rule|${next}`] : [] });
       return;
     }
     current = makeCard(random);
