@@ -5,13 +5,13 @@ import { markUnlocked } from '../storage.js';
 export const definition = {
   id: 'reaction',
   modes: [
-    { id: 'staged', name: '连续反应', ruleVersion: 2, presets: [
+    { id: 'staged', name: '连续反应', ruleVersion: 3, presets: [
       { id: 'beginner', name: '初级', settings: { minWait: 1.5, maxWait: 4.5 } },
-      { id: 'intermediate', name: '中级', settings: { minWait: 1.5, maxWait: 4.5 }, unlock: { key: 'reaction|staged|intermediate', requires: ['reaction|staged|intermediate'] } },
-      { id: 'advanced', name: '高级', settings: { minWait: 1.5, maxWait: 4.5 }, unlock: { key: 'reaction|staged|advanced', requires: ['reaction|staged|advanced'] } },
+      { id: 'intermediate', name: '中级', settings: { minWait: 1, maxWait: 3 }, unlock: { key: 'reaction|staged|intermediate', requires: ['reaction|staged|intermediate'] } },
+      { id: 'advanced', name: '高级', settings: { minWait: 0.5, maxWait: 1.5 }, unlock: { key: 'reaction|staged|advanced', requires: ['reaction|staged|advanced'] } },
       { id: 'custom', name: '自定义', settings: { minWait: 1.5, maxWait: 4.5 }, unlock: { key: 'reaction|staged|intermediate', requires: ['reaction|staged|intermediate'] }, fields: [
-        { key: 'minWait', label: '最短等待', type: 'number', default: 1.5, min: 0.5, max: 10, step: 0.1, unit: '秒' },
-        { key: 'maxWait', label: '最长等待', type: 'number', default: 4.5, min: 0.5, max: 10, step: 0.1, unit: '秒' },
+        { key: 'minWait', label: '最短等待', type: 'number', default: 1.5, min: 1.5, max: 3, step: 0.5, unit: '秒', minByUnlock: [{ key: 'reaction|staged|intermediate', min: 1 }, { key: 'reaction|staged|advanced', min: 0.5 }] },
+        { key: 'maxWait', label: '最长等待', type: 'number', default: 4.5, min: 2, max: 4.5, step: 0.5, unit: '秒', maxByUnlock: [{ key: 'reaction|staged|intermediate', max: 5 }, { key: 'reaction|staged|advanced', max: 6 }] },
       ] },
     ], validateSettings: (settings) => settings.minWait > settings.maxWait ? '最短等待不能大于最长等待.' : '', score: { unit: 'ms', lower: true, min: 0 }, hiddenPolicy: 'invalidate', inputs: ['pointer', 'touch', 'keyboard'], rule: '点击开始, 变绿后响应. 可连续测量并在完成时保存平均值.' },
     { id: 'single', name: '重复测量', ruleVersion: 2, presets: [{ id: 'default', name: '单次计时', settings: {} }], score: { unit: '秒', lower: true, min: 0 }, hiddenPolicy: 'invalidate', inputs: ['pointer', 'touch', 'keyboard'], rule: '点击开始, 等待绿色信号, 再尽快响应. 点击继续可再次测量.' },
