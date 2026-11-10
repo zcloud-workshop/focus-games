@@ -168,3 +168,69 @@ export function swapAdjacent(order, index, direction) {
   [next[index], next[other]] = [next[other], next[index]];
   return next;
 }
+
+export function sudokuCandidates(board, index) {
+  if (board[index]) return [];
+  const row = Math.floor(index / 9);
+  const col = index % 9;
+  const used = new Set();
+  for (let i = 0; i < 9; i++) {
+    used.add(board[row * 9 + i]);
+    used.add(board[i * 9 + col]);
+    used.add(board[(Math.floor(row / 3) * 3 + Math.floor(i / 3)) * 9 + Math.floor(col / 3) * 3 + i % 3]);
+  }
+  return [1, 2, 3, 4, 5, 6, 7, 8, 9].filter((value) => !used.has(value));
+}
+
+export function solveSudoku(board, limit = 2) {
+  const work = [...board];
+  const solutions = [];
+  for (let i = 0; i < 81; i++) {
+    if (!work[i]) continue;
+    const value = work[i];
+    work[i] = 0;
+    const legal = sudokuCandidates(work, i).includes(value);
+    work[i] = value;
+    if (!legal) return solutions;
+  }
+  const visit = () => {
+    if (solutions.length >= limit) return;
+    let best = -1;
+    let options = null;
+    for (let i = 0; i < 81; i++) {
+      if (work[i]) continue;
+      const candidates = sudokuCandidates(work, i);
+      if (!candidates.length) return;
+      if (!options || candidates.length < options.length) { best = i; options = candidates; }
+    }
+    if (best === -1) { solutions.push([...work]); return; }
+    for (const value of options) { work[best] = value; visit(); work[best] = 0; }
+  };
+  visit();
+  return solutions;
+}
+
+export function rateSudoku(board) {
+  const work = [...board];
+  let hidden = 0;
+  const units = [
+    ...Array.from({ length: 9 }, (_, row) => Array.from({ length: 9 }, (_, col) => row * 9 + col)),
+    ...Array.from({ length: 9 }, (_, col) => Array.from({ length: 9 }, (_, row) => row * 9 + col)),
+    ...Array.from({ length: 9 }, (_, box) => Array.from({ length: 9 }, (_, i) => (Math.floor(box / 3) * 3 + Math.floor(i / 3)) * 9 + box % 3 * 3 + i % 3)),
+  ];
+  while (work.includes(0)) {
+    const candidates = work.map((_, index) => sudokuCandidates(work, index));
+    const single = candidates.findIndex((values) => values.length === 1);
+    if (single >= 0) { work[single] = candidates[single][0]; continue; }
+    let found = false;
+    for (const unit of units) {
+      for (let value = 1; value <= 9; value++) {
+        const positions = unit.filter((index) => candidates[index].includes(value));
+        if (positions.length === 1) { work[positions[0]] = value; hidden++; found = true; break; }
+      }
+      if (found) break;
+    }
+    if (!found) return 'hard';
+  }
+  return hidden ? 'normal' : 'easy';
+}
