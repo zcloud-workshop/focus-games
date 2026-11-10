@@ -1,4 +1,4 @@
-import { createRuntime, inputTime } from './runtime.js';
+import { createRuntime, inputMethod, inputTime, trackInputs } from './runtime.js';
 import { presentOnFrame } from './trials.js';
 import { shuffle } from '../core.js';
 
@@ -77,7 +77,7 @@ export function mountChoices({ root, mode, preset, settings, onFinish, random = 
   const runtime = createRuntime({ onFinish, clock });
   const values = { ...preset.settings, ...settings };
   const trials = [];
-  const inputs = new Set();
+  const inputs = trackInputs();
   const start = runtime.now();
   const deadline = values.duration ? start + values.duration * 1000 : Infinity;
   let shownAt;
@@ -93,7 +93,7 @@ export function mountChoices({ root, mode, preset, settings, onFinish, random = 
     const [first, second] = groupPair.map((key) => metrics.groups[key]?.meanMs);
     metrics.effectMs = Number.isFinite(first) && Number.isFinite(second) ? first - second : null;
     const score = kind === 'number-comparison' ? metrics.correct : values.penalty ? (metrics.meanMs === null ? null : (metrics.meanMs + metrics.errors * values.penalty) / 1000) : scoredTrials.length ? Math.round(metrics.correct / scoredTrials.length * 100) : null;
-    runtime.finish({ value: score, detail: `${scoredTrials.length} 题中答对 ${metrics.correct} 题`, mode: mode.id, preset: preset.id, settings: values, rules: mode.ruleVersion, input: inputs.size === 1 ? [...inputs][0] : inputs.size ? 'mixed' : 'any', endReason: values.duration ? 'timeout' : 'completed', scored: score !== null, metrics, trials });
+    runtime.finish({ value: score, detail: `${scoredTrials.length} 题中答对 ${metrics.correct} 题`, mode: mode.id, preset: preset.id, settings: values, rules: mode.ruleVersion, input: inputs.value, endReason: values.duration ? 'timeout' : 'completed', scored: score !== null, metrics, trials });
   };
   const advance = () => {
     if (runtime.now() >= deadline || (values.count && trials.length >= values.count + (values.practice ?? 0))) { finish(); return; }
@@ -123,13 +123,13 @@ export function mountChoices({ root, mode, preset, settings, onFinish, random = 
   runtime.listen(root, 'pointerdown', (event) => {
     const button = event.target.closest('[data-choice]');
     if (!button || event.button !== 0) return;
-    event.preventDefault(); record(Number(button.dataset.choice), inputTime(event, runtime.now), event.pointerType === 'touch' ? 'touch' : 'pointer');
+    event.preventDefault(); record(Number(button.dataset.choice), inputTime(event, runtime.now), inputMethod(event));
   });
   runtime.listen(document, 'keydown', (event) => {
     if (event.repeat || event.ctrlKey || event.metaKey || event.altKey) return;
     const index = ({ ArrowLeft: 0, KeyF: 0, KeyA: 0, ArrowRight: 1, KeyJ: 1, KeyD: 1 })[event.code] ?? (event.code.startsWith('Digit') ? Number(event.code.slice(5)) - 1 : -1);
     if (index < 0 || !current || index >= current.options.length) return;
-    event.preventDefault(); record(index, inputTime(event, runtime.now), 'keyboard');
+    event.preventDefault(); record(index, inputTime(event, runtime.now), inputMethod(event));
   });
   if (values.duration) runtime.later(finish, values.duration * 1000);
   advance();
