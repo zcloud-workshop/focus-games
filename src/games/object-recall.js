@@ -1,3 +1,4 @@
+import { createInputTracker } from '../engines/input.js';
 import { shuffle } from '../core.js';
 import { createRuntime } from '../engines/runtime.js';
 
@@ -21,7 +22,7 @@ const objects = [
 export const definition = {
   id: 'object-recall',
   modes: [{
-    id: 'free-recall', name: '自由回忆', ruleVersion: 2,
+    id: 'free-recall', name: '自由回忆', ruleVersion: 3,
     presets: [{ id: 'standard', name: '12 件物品', settings: {} }],
     score: { unit: '个', lower: false, min: 0, max: 12 },
     hiddenPolicy: 'invalidate', inputs: ['keyboard', 'touch'],
@@ -34,25 +35,26 @@ export function makeObjects(random = Math.random) {
 }
 
 export function scoreRecall(selected, answers) {
-  const matched = new Set();
-  for (const answer of answers) {
-    const word = answer.trim().normalize('NFKC').toLowerCase();
-    const item = selected.find(({ name, aliases }) => [name, ...aliases].some((alias) => alias.toLowerCase() === word));
-    if (item) matched.add(item.name);
-  }
-  return [...matched];
+  const normalize = (value) => value.trim().normalize('NFKC').toLowerCase().replace(/\s+/g, '');
+  const words = answers.map(normalize).filter(Boolean);
+  return selected.filter(({ name, aliases }) => [name, ...aliases].some((item) => {
+    const term = normalize(item);
+    return words.some((word) => term.includes(word) || word.includes(term));
+  })).map((item) => item.name);
 }
 
 export function mount({ root, mode, preset, settings, onFinish, random = Math.random, clock = globalThis }) {
   const runtime = createRuntime({ onFinish, clock });
+  const inputKind = createInputTracker(runtime, root);
   const selected = makeObjects(random);
-  let phase = 'study';
+  let phase = 'study', recallAt;
   root.innerHTML = '<p class="stage-note">记住这些物品. 准备好后进入回忆阶段.</p>' +
     `<div class="play-grid" style="--columns:4">${selected.map(({ name, drawing }) => `<div class="play-cell" style="display:flex;flex-direction:column;align-items:center;justify-content:center"><svg viewBox="0 0 48 48" width="44" height="44" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${drawing}</svg><span>${name}</span></div>`).join('')}</div>` +
     '<button class="button primary centered" type="button" data-ready>准备好了</button>';
   runtime.listen(root, 'click', (event) => {
     if (!event.target.closest('[data-ready]') || phase !== 'study') return;
     phase = 'recall';
+    recallAt = runtime.now();
     root.innerHTML = '<p class="stage-note">按任意顺序输入记住的物品, 每格一项.</p>' +
       `<form class="number-form"><div class="play-grid" style="--columns:3">${Array.from({ length: 12 }, (_, i) => `<input aria-label="物品 ${i + 1}" autocomplete="off" maxlength="24">`).join('')}</div><button class="button primary" type="submit">提交答案</button></form>`;
     root.querySelector('input').focus();
@@ -64,7 +66,7 @@ export function mount({ root, mode, preset, settings, onFinish, random = Math.ra
     if (!answers.some((answer) => answer.trim())) return;
     phase = 'finished';
     const matched = scoreRecall(selected, answers);
-    runtime.finish({ value: matched.length, detail: `记住 ${matched.length} / 12 件物品`, mode: mode.id, preset: preset.id, settings, rules: mode.ruleVersion, input: 'mixed', endReason: 'completed', scored: true, metrics: { correct: matched.length, total: 12 } });
+    runtime.finish({ value: matched.length, detail: `记住 ${matched.length} / 12 件物品`, mode: mode.id, preset: preset.id, settings, rules: mode.ruleVersion, input: inputKind(), endReason: 'completed', scored: true, metrics: { correct: matched.length, total: 12, recallSeconds: (runtime.now() - recallAt) / 1000 } });
   });
   return runtime.cleanup;
 }
