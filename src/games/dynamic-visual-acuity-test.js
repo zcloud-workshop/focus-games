@@ -1,3 +1,4 @@
+import { createInputTracker } from '../engines/input.js';
 import { randomDigits } from '../engines/sequence.js';
 import { createRuntime } from '../engines/runtime.js';
 import { presentOnFrame } from '../engines/trials.js';
@@ -10,6 +11,7 @@ export function levelSettings(level) {
 
 export function mount({ root, mode, preset, settings, onFinish, random = Math.random, clock = globalThis }) {
   const runtime = createRuntime({ onFinish, clock });
+  const inputKind = createInputTracker(runtime, root);
   let level = 1, answer = '', phase = 'show', presentedAt;
   const trials = [];
   const show = () => {
@@ -34,7 +36,7 @@ export function mount({ root, mode, preset, settings, onFinish, random = Math.ra
     if (phase !== 'answer') return;
     const input = root.querySelector('input').value;
     trials.at(-1).correct = input === answer;
-    if (input !== answer) { phase = 'finished'; runtime.finish({ value: level - 1, detail: `通过 ${level - 1} 关, 本关数字为 ${answer}`, mode: mode.id, preset: preset.id, settings, rules: mode.ruleVersion, input: 'mixed', endReason: 'mistake', scored: true, metrics: { completed: level - 1 }, trials }); return; }
+    if (input !== answer) { phase = 'finished'; runtime.finish({ value: level - 1, detail: `通过 ${level - 1} 关, 本关数字为 ${answer}`, mode: mode.id, preset: preset.id, settings, rules: mode.ruleVersion, input: inputKind(), endReason: 'mistake', scored: true, metrics: { completed: level - 1 }, trials }); return; }
     level++; show();
   });
   show();
