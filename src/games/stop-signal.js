@@ -1,8 +1,10 @@
 import { mountInhibition } from '../engines/inhibition.js';
 
-export const definition = { id: 'stop-signal', modes: [{ id: 'stop', name: '停止信号', ruleVersion: 2, presets: [
-  { id: 'default', name: '标准', settings: { count: 40, stopRate: 25, window: 1200, delayMin: 150, delayMax: 400, interval: 400 } },
-  { id: 'custom', name: '自定义', settings: { count: 40, stopRate: 25, window: 1200, delayMin: 150, delayMax: 400, interval: 400 }, fields: [
+export const definition = { id: 'stop-signal', modes: [{ id: 'stop', name: '停止信号', ruleVersion: 3, presets: [
+  { id: 'beginner', name: '初级', settings: { count: 40, stopRate: 25, window: 1200, delayMin: 150, delayMax: 400, interval: 400 } },
+  { id: 'standard', name: '中级', settings: { count: 40, stopRate: 25, window: 1200, delayMin: 150, delayMax: 400, interval: 400 }, unlock: { requires: ['stop-signal|stop|standard'] } },
+  { id: 'fast', name: '高级', settings: { count: 40, stopRate: 25, window: 1200, delayMin: 150, delayMax: 400, interval: 400 }, unlock: { requires: ['stop-signal|stop|fast'] } },
+  { id: 'custom', name: '自定义', settings: { count: 40, stopRate: 25, window: 1200, delayMin: 150, delayMax: 400, interval: 400 }, unlock: { requires: ['stop-signal|stop|standard'] }, fields: [
     { key: 'count', label: '试次数', type: 'number', default: 40, min: 10, max: 100, step: 1 },
     { key: 'stopRate', label: '停止比例', type: 'number', default: 25, min: 10, max: 90, step: 5, unit: '%' },
     { key: 'window', label: '响应窗', type: 'number', default: 1200, min: 500, max: 3000, step: 100, unit: '毫秒' },
