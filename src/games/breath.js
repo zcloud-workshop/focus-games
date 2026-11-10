@@ -15,7 +15,7 @@ export const definition = {
         { key: 'exhale', label: '呼气', type: 'number', default: 4, min: 1, max: 30, step: 1, unit: '秒' },
       ] },
     ],
-    score: { unit: '轮', lower: false, min: 0 }, hiddenPolicy: 'invalidate', inputs: ['pointer', 'keyboard'],
+    score: { unit: '轮', lower: false, min: 0 }, hiddenPolicy: 'invalidate', inputs: ['unknown'],
     rule: '跟随引导完成 3 轮. 如感到不适, 请随时停止.',
   }, {
     id: 'guided', name: '定时呼吸', ruleVersion: 2,
@@ -31,7 +31,7 @@ export const definition = {
       { key: 'holdOut', label: '呼后屏息', type: 'number', default: 0, min: 0, max: 30, step: 1, unit: '秒' },
       { key: 'minutes', label: '训练时长', type: 'number', default: 5, min: 1, max: 30, step: 1, unit: '分钟' },
     ],
-    score: { unit: '轮', lower: false, min: 0 }, hiddenPolicy: 'invalidate', inputs: ['pointer', 'keyboard'],
+    score: { unit: '轮', lower: false, min: 0 }, hiddenPolicy: 'invalidate', inputs: ['unknown'],
     rule: '跟随节奏舒适呼吸. 屏息不适时可选择无屏息配置或随时退出.',
   }],
 };
@@ -68,7 +68,7 @@ export function mount({ root, mode = definition.modes[0], preset = mode.presets[
     circle.style.transform = `scale(${scale})`;
     if (elapsed >= goal) {
       const next = { beginner: 'intermediate', intermediate: 'advanced', advanced: 'box' }[preset.id];
-      runtime.finish({ value: phase.cycles, detail: `完成 ${phase.cycles} 个完整呼吸周期`, mode: mode.id, preset: preset.id, settings: values, rules: mode.ruleVersion, input: 'any', endReason: 'completed', scored: true, metrics: { activeSeconds: elapsed }, unlocks: staged && next ? [`breath|staged|${next}`] : [] });
+      runtime.finish({ value: phase.cycles, detail: `完成 ${phase.cycles} 个完整呼吸周期`, duration: elapsed, mode: mode.id, preset: preset.id, settings: values, rules: mode.ruleVersion, input: 'unknown', endReason: 'completed', scored: true, metrics: { activeSeconds: elapsed }, unlocks: staged && next ? [`breath|staged|${next}`] : [] });
       return;
     }
     runtime.frame(render);
