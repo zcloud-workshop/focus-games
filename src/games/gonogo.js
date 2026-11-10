@@ -10,5 +10,5 @@ export const definition = { id: 'gonogo', modes: [{ id: 'signals', name: '响应
     { key: 'window', label: '响应窗', type: 'number', default: 1200, min: 300, max: 3000, step: 100, unit: '毫秒' },
     { key: 'interval', label: '间隔', type: 'number', default: 400, min: 0, max: 2000, step: 100, unit: '毫秒' },
   ] },
-], score: { unit: '%', lower: false, min: 0, max: 100 }, hiddenPolicy: 'invalidate', inputs: ['pointer', 'keyboard'], rule: '绿色出现时响应, 红色出现时保持不动. 成绩为等待试次的正确率.' }] };
+], score: { unit: '%', lower: false, min: 0, max: 100 }, hiddenPolicy: 'invalidate', inputs: ['pointer', 'touch', 'keyboard'], rule: '绿色出现时响应, 红色出现时保持不动. 成绩为等待试次的正确率.' }] };
 export const mount = (options) => mountInhibition({ ...options, kind: 'gonogo' });
