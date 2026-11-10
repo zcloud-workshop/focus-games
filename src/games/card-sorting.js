@@ -1,4 +1,4 @@
-import { createRuntime, inputTime } from '../engines/runtime.js';
+import { createRuntime, inputMethod, inputTime, trackInputs } from '../engines/runtime.js';
 import { presentOnFrame } from '../engines/trials.js';
 
 const colors = ['#c44343', '#3275bf', '#27805e', '#b86b14'];
@@ -16,7 +16,7 @@ export function mount({ root, mode = definition.modes[0], preset = mode.presets[
   const runtime = createRuntime({ onFinish, clock });
   const values = { ...preset.settings, ...settings };
   const trials = [];
-  const inputs = new Set();
+  const inputs = trackInputs();
   let current;
   let ruleIndex = 0;
   let previousRule = null;
@@ -28,7 +28,7 @@ export function mount({ root, mode = definition.modes[0], preset = mode.presets[
   const show = () => {
     if (trials.length === values.count) {
       const correct = trials.filter((trial) => trial.correct).length;
-      runtime.finish({ value: Math.round(correct / trials.length * 100), detail: `${trials.length} 题中答对 ${correct} 题, 完成 ${categories} 组分类`, mode: mode.id, preset: preset.id, settings: values, rules: mode.ruleVersion, input: inputs.size === 1 ? [...inputs][0] : inputs.size ? 'mixed' : 'any', endReason: 'completed', scored: true, metrics: { correct, errors: trials.length - correct, categories, perseverativeErrors: trials.filter((trial) => trial.perseverative).length }, trials });
+      runtime.finish({ value: Math.round(correct / trials.length * 100), detail: `${trials.length} 题中答对 ${correct} 题, 完成 ${categories} 组分类`, mode: mode.id, preset: preset.id, settings: values, rules: mode.ruleVersion, input: inputs.value, endReason: 'completed', scored: true, metrics: { correct, errors: trials.length - correct, categories, perseverativeErrors: trials.filter((trial) => trial.perseverative).length }, trials });
       return;
     }
     current = makeCard(random);
@@ -47,8 +47,8 @@ export function mount({ root, mode = definition.modes[0], preset = mode.presets[
     root.querySelector('.stage-note').textContent = correct ? '正确' : '不匹配';
     runtime.later(show, 500);
   };
-  runtime.listen(root, 'pointerdown', (event) => { const button = event.target.closest('[data-card]'); if (!button || event.button !== 0) return; event.preventDefault(); answer(Number(button.dataset.card), event, event.pointerType === 'touch' ? 'touch' : 'pointer'); });
-  runtime.listen(document, 'keydown', (event) => { if (event.repeat || event.ctrlKey || event.metaKey || event.altKey) return; const index = Number(event.code.replace('Digit', '')) - 1; if (index < 0 || index > 3 || !Number.isInteger(index)) return; event.preventDefault(); answer(index, event, 'keyboard'); });
+  runtime.listen(root, 'pointerdown', (event) => { const button = event.target.closest('[data-card]'); if (!button || event.button !== 0) return; event.preventDefault(); answer(Number(button.dataset.card), event, inputMethod(event)); });
+  runtime.listen(document, 'keydown', (event) => { if (event.repeat || event.ctrlKey || event.metaKey || event.altKey) return; const index = Number(event.code.replace('Digit', '')) - 1; if (index < 0 || index > 3 || !Number.isInteger(index)) return; event.preventDefault(); answer(index, event, inputMethod(event)); });
   show();
   return runtime.cleanup;
 }
