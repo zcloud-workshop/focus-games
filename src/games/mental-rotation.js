@@ -15,7 +15,10 @@ export const definition = {
       { id: 'complex', name: '3 × 3 复杂', settings: { shape: 'complex', rounds: 15 } },
       { id: 'large', name: '4 × 4', settings: { shape: 'large', rounds: 15 } },
     ],
-    fields: [{ key: 'rounds', label: '题数', type: 'number', default: 15, min: 5, max: 40, step: 1 }],
+    fields: [
+      { key: 'rounds', label: '题数', type: 'number', default: 15, min: 5, max: 40, step: 1 },
+      { key: 'shape', label: '图形', type: 'select', default: 'simple', options: [{ value: 'simple', label: '3 × 3' }, { value: 'complex', label: '3 × 3 复杂' }, { value: 'large', label: '4 × 4' }] },
+    ],
     score: { unit: '%', lower: false, min: 0, max: 100 }, hiddenPolicy: 'invalidate',
     inputs: ['pointer'], rule: '选择能由上方图形旋转得到的图形, 镜像不能通过旋转重合.'
   }]
