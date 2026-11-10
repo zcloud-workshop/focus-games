@@ -49,6 +49,12 @@ export function breathPhase(seconds, settings) {
   }
 }
 
+export function breathUnlock(preset, cycles) {
+  if (cycles < 3) return [];
+  const next = { beginner: ['intermediate'], intermediate: ['advanced', 'box'] }[preset] ?? [];
+  return next.map((id) => `breath|staged|${id}`);
+}
+
 export function mount({ root, mode = definition.modes[0], preset = mode.presets[0], settings = preset.settings, onFinish, clock = globalThis }) {
   const runtime = createRuntime({ onFinish, clock });
   const values = { ...preset.settings, ...settings };
@@ -73,8 +79,7 @@ export function mount({ root, mode = definition.modes[0], preset = mode.presets[
     const scale = phase.label === '吸气' ? 1 + phase.progress * 0.35 : phase.label === '呼气' ? 1.35 - phase.progress * 0.35 : (values.holdOut && (elapsed - segmentStart) % cycle >= values.inhale + values.holdIn + values.exhale ? 1 : 1.35);
     circle.style.transform = `scale(${scale})`;
     if (elapsed >= goal) {
-      const next = { beginner: 'intermediate', intermediate: 'advanced', advanced: 'box' }[preset.id];
-      runtime.finish({ value: cycles, detail: `完成 ${cycles} 个完整呼吸周期`, duration: elapsed, mode: mode.id, preset: preset.id, settings: values, rules: mode.ruleVersion, input: 'unknown', endReason: 'completed', scored: true, metrics: { activeSeconds: elapsed }, unlocks: staged && next && cycles >= 3 ? [`breath|staged|${next}`] : [] });
+      runtime.finish({ value: cycles, detail: `完成 ${cycles} 个完整呼吸周期`, duration: elapsed, mode: mode.id, preset: preset.id, settings: values, rules: mode.ruleVersion, input: 'unknown', endReason: 'completed', scored: true, metrics: { activeSeconds: elapsed }, unlocks: staged ? breathUnlock(preset.id, cycles) : [] });
       return;
     }
     runtime.frame(render);
