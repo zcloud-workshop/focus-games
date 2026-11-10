@@ -9,6 +9,10 @@ export function makeCard(random = Math.random) {
   return Object.fromEntries(rules.map((key) => [key, Math.floor(random() * 4)]));
 }
 export function matchCard(card, rule, option) { return card[rule] === option; }
+export function nextCardRule(index, random = Math.random) {
+  const choices = rules.map((_, i) => i).filter((i) => i !== index);
+  return choices[Math.floor(random() * choices.length)];
+}
 
 export const definition = { id: 'card-sorting', modes: [{ id: 'hidden-rule', name: '发现分类规则', ruleVersion: 3, presets: [30, 40, 60].map((count) => ({ id: String(count), name: `${count} 题`, settings: { count, streak: 5 } })).concat({ id: 'custom', name: '自定义', settings: { count: 40, streak: 5 }, fields: [{ key: 'count', label: '题数', type: 'number', default: 40, min: 10, max: 100, step: 1 }] }), score: { unit: '组', lower: false, min: 0 }, hiddenPolicy: 'invalidate', inputs: ['pointer', 'touch', 'keyboard'], rule: '根据对错反馈发现卡片的匹配规则. 规则会在练习中改变.' }] };
 
@@ -43,7 +47,7 @@ export function mount({ root, mode = definition.modes[0], preset = mode.presets[
     const correct = matchCard(current, rules[ruleIndex], index);
     trials.push({ correct, responseMs: Math.max(0, inputTime(event, runtime.now) - shownAt), perseverative: !correct && previousRule !== null && matchCard(current, previousRule, index) });
     streak = correct ? streak + 1 : 0;
-    if (streak >= values.streak) { categories++; streak = 0; previousRule = rules[ruleIndex]; ruleIndex = (ruleIndex + 1) % rules.length; }
+    if (streak >= values.streak) { categories++; streak = 0; previousRule = rules[ruleIndex]; ruleIndex = nextCardRule(ruleIndex, random); }
     root.querySelector('.stage-note').textContent = correct ? '正确' : '不匹配';
     runtime.later(show, 500);
   };
