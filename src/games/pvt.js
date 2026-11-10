@@ -4,7 +4,7 @@ import { meanValidResponses, presentOnFrame } from '../engines/trials.js';
 export const definition = { id: 'pvt', modes: [{ id: 'vigilance', name: '持续警觉', ruleVersion: 2, presets: [
   { id: 'brief', name: '3 分钟', settings: { duration: 180, minWait: 1000, maxWait: 4000, lapse: 355 } },
   { id: 'full', name: '10 分钟', settings: { duration: 600, minWait: 2000, maxWait: 10000, lapse: 500 } },
-], score: { unit: 'ms', lower: true, min: 0 }, hiddenPolicy: 'invalidate', inputs: ['pointer', 'keyboard'], rule: '等待数字出现后立即点击或按空格. 持续到计时结束.' }] };
+], score: { unit: 'ms', lower: true, min: 0 }, hiddenPolicy: 'invalidate', inputs: ['pointer', 'touch', 'keyboard'], rule: '等待数字出现后立即点击或按空格. 持续到计时结束.' }] };
 
 export function pvtMetrics(trials, lapse) {
   const valid = trials.filter((trial) => trial.valid).map((trial) => trial.responseMs).sort((a, b) => a - b);
