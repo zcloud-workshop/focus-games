@@ -5,7 +5,7 @@ const makeMode = (id, name, rule, extra = {}) => ({ id, name, ruleVersion: 2, pr
 export const definition = { id: 'dual-n-back', modes: [
   makeMode('position-tone', '位置与音调', '分别判断位置和音调是否与 N 步前相同.'),
   makeMode('position-letter', '位置与字母声音', '分别判断位置和听到的字母是否与 N 步前相同.'),
-  makeMode('tile-tone', '图形与声音', '分别判断图形身份和声音是否与 N 步前相同.'),
+  makeMode('tile-tone', '牌面与声音', '分别判断牌面身份和声音是否与 N 步前相同.'),
   makeMode('tutorial', '双通道练习', '跟随视觉和声音, 匹配时分别响应. 本练习不计分.', { presets: [{ id: 'practice', name: '约 30 秒', settings: { n: 1, count: 9, interval: 3000 } }], fields: [], scored: false }),
 ] };
 export function mount(options) { return mountTimed({ ...options, kind: 'dual' }); }
