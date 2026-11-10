@@ -37,6 +37,24 @@ test('干扰试次只把正确反应计入组均值', () => {
   assert.equal(metrics.errors, 1);
 });
 
+test('色词反向模式答案取字义, 而正向模式取显示颜色', () => {
+  const options = { colors: 3, variant: 'word' };
+  const reverse = choiceTrial('stroop', options, seeded(42));
+  const ink = choiceTrial('stroop', { ...options, variant: 'ink' }, seeded(42));
+  const word = reverse.stimulus.match(/>([^<]+)<\/span>/)[1];
+  assert.equal(reverse.options[reverse.answer], `${word}色`);
+  assert.equal(reverse.stimulus, ink.stimulus);
+  if (reverse.group === 'conflict') assert.notEqual(reverse.answer, ink.answer);
+});
+
+test('线索有效与无效比例两端按规则生成', () => {
+  const valid = choiceTrial('posner-cue', { validRate: 100 }, seeded(2));
+  const invalid = choiceTrial('posner-cue', { validRate: 0 }, seeded(2));
+  assert.equal(valid.group, 'valid');
+  assert.equal(invalid.group, 'invalid');
+  assert.notEqual(valid.cue, invalid.cue);
+});
+
 test('抑制任务分别统计漏按与误按', () => {
   const result = inhibitionSummary([{ stop: false, correct: false, response: null }, { stop: false, correct: true, response: 'press' }, { stop: true, correct: false, response: 'press' }, { stop: true, correct: true, response: null }]);
   assert.deepEqual(result, { goCorrect: 1, goTotal: 2, stopCorrect: 1, stopTotal: 2, omissions: 1, falseAlarms: 1 });
