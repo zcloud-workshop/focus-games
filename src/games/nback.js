@@ -1,3 +1,4 @@
+import { createInputTracker } from '../engines/input.js';
 import { shuffle } from '../core.js';
 import { makeChannel } from '../engines/nback.js';
 import { createRuntime } from '../engines/runtime.js';
@@ -11,6 +12,7 @@ const symbols = ['○','△','□','◇','⬡','✕','＋','☆','▽','▱','�
 export function pictureChoices(target, random = Math.random) { return shuffle([target, ...shuffle(symbols.filter((item) => item !== target), random).slice(0, 3)], random); }
 export function mount({ root, mode, preset, settings, onFinish, random = Math.random, clock = globalThis }) {
   const runtime = createRuntime({ onFinish, clock });
+  const inputKind = createInputTracker(runtime, root);
   const pictures = mode.id === 'pictures';
   const sequence = makeChannel({ values: pictures ? symbols : [...'BCDFGHJKLMPRST'], n: settings.n, count: settings.count, random });
   let index = 0, correct = 0, choices = [], active = true;
@@ -29,7 +31,7 @@ export function mount({ root, mode, preset, settings, onFinish, random = Math.ra
       if (pictures ? choices[Number(value)] === target : (value === 'same') === (sequence[index] === target)) correct++;
     }
     index++;
-    if (index === sequence.length) { active = false; runtime.finish({ value: correct / settings.count * 100, detail: `${settings.count} 题答对 ${correct} 题`, mode: mode.id, preset: preset.id, settings, rules: mode.ruleVersion, input: 'mixed', endReason: 'completed', scored: true, metrics: { correct, total: settings.count } }); }
+    if (index === sequence.length) { active = false; runtime.finish({ value: correct / settings.count * 100, detail: `${settings.count} 题答对 ${correct} 题`, mode: mode.id, preset: preset.id, settings, rules: mode.ruleVersion, input: inputKind(), endReason: 'completed', scored: true, metrics: { correct, total: settings.count } }); }
     else show();
   });
   show(); return runtime.cleanup;
