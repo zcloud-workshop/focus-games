@@ -4,7 +4,7 @@ export const definition = {
     id: 'timed', name: '数字镜像', ruleVersion: 2,
     presets: [{ id: 'standard', name: '120 秒', settings: {} }],
     score: { unit: '分', lower: false, min: -1000000 }, hiddenPolicy: 'invalidate',
-    inputs: ['pointer', 'keyboard'], rule: '数字可能旋转, 判断它是否左右镜像.'
+    inputs: ['pointer', 'touch', 'keyboard', 'mixed'], rule: '数字可能旋转, 判断它是否左右镜像.'
   }]
 };
 
@@ -22,7 +22,7 @@ export function mount({ root, mode, preset, settings, onFinish, random = Math.ra
   let score = 0;
   let correct = 0;
   let wrong = 0;
-  let lastInput = 'pointer';
+  const inputs = trackInputs();
   let timer;
   let active = true;
   const cleanup = () => { active = false; controller.abort(); clock.clearTimeout(timer); };
@@ -40,26 +40,26 @@ export function mount({ root, mode, preset, settings, onFinish, random = Math.ra
     if (!remaining) {
       const duration = (clock.performance.now() - started) / 1000;
       cleanup();
-      onFinish({ value: score, detail: `答对 ${correct} 题, 答错 ${wrong} 题`, duration, mode: mode.id, preset: preset.id, settings, rules: mode.ruleVersion, input: lastInput, endReason: 'timeout', scored: true, metrics: { correct, wrong }, trials: [] });
+      onFinish({ value: score, detail: `答对 ${correct} 题, 答错 ${wrong} 题`, duration, mode: mode.id, preset: preset.id, settings, rules: mode.ruleVersion, input: inputs.value, endReason: 'timeout', scored: true, metrics: { correct, wrong }, trials: [] });
     } else timer = clock.setTimeout(tick, Math.min(100, remaining));
   };
-  const respond = (value, input) => {
-    if (!active || clock.performance.now() >= deadline) return;
-    lastInput = input;
+  const respond = (value, input, at) => {
+    if (!active || at >= deadline) return;
+    inputs.add(input);
     if (value === mirrored) { score++; correct++; }
     else { score--; wrong++; }
     next();
   };
-  root.addEventListener('click', (event) => {
-    const button = event.target.closest('button[data-answer]');
-    if (button) respond(button.dataset.answer === 'yes', 'pointer');
-  }, { signal: controller.signal });
+  bindBoardButtons(root, 'button[data-answer]', (button, input, at) => respond(button.dataset.answer === 'yes', input, at), controller.signal, () => clock.performance.now());
   document.addEventListener('keydown', (event) => {
     if (event.repeat || event.target.matches('input, textarea, select')) return;
-    if (event.code === 'Digit1') respond(false, 'keyboard');
-    if (event.code === 'Digit2') respond(true, 'keyboard');
+    if (event.code === 'Digit1') respond(false, 'keyboard', inputTime(event, () => clock.performance.now()));
+    if (event.code === 'Digit2') respond(true, 'keyboard', inputTime(event, () => clock.performance.now()));
   }, { signal: controller.signal });
   next();
   tick();
   return cleanup;
 }
+import { bindBoardButtons, trackInputs } from '../engines/board-input.js';
+import { inputTime } from '../engines/runtime.js';
+
