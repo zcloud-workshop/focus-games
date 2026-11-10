@@ -3,8 +3,13 @@ import { uniquePositions } from '../engines/sequence.js';
 import { createRuntime } from '../engines/runtime.js';
 import { presentOnFrame } from '../engines/trials.js';
 
-const presets = [3, 4, 5].map((size) => ({ id: `grid-${size}`, name: `${size} × ${size}`, settings: { size, duration: 4000 } }));
-const space = (id, name) => ({ id, name, ruleVersion: 2, presets, fields: [{ key: 'duration', label: '记忆时间', type: 'number', default: 4000, min: 1000, max: 15000, step: 500, unit: '毫秒' }], score: { unit: '个', lower: false, min: 0 }, hiddenPolicy: 'invalidate', inputs: ['pointer', 'touch', 'keyboard'], rule: '记住网格中符号的位置, 隐藏后按顺序点击.' });
+const medium = 'numbers:medium', hard = 'numbers:hard', letters = 'numbers:letters';
+const presets = [[3, 2500], [4, 2000], [5, 1500]].map(([size, duration]) => ({ id: `grid-${size}`, name: `${size} × ${size}`, settings: { size, duration }, ...(size > 3 ? { unlock: { requires: [size === 4 ? medium : hard] } } : {}) }));
+const custom = { id: 'custom', name: '自定义', settings: { size: 3, duration: 2500 }, unlock: { requires: [medium] }, fields: [
+  { key: 'size', label: '网格边长', type: 'number', min: 3, max: 3, step: 1, maxByUnlock: [{ key: medium, max: 4 }, { key: hard, max: 6 }] },
+  { key: 'duration', label: '记忆时间', type: 'number', min: 1500, max: 3000, step: 500, unit: '毫秒', minByUnlock: [{ key: medium, min: 1000 }, { key: hard, min: 500 }] },
+] };
+const space = (id, name) => ({ id, name, ruleVersion: 3, presets: [...presets, id === 'letters' ? { ...custom, fields: custom.fields.map((field) => field.key === 'size' ? { ...field, maxByUnlock: [{ key: medium, max: 4 }, { key: hard, max: 5 }] } : field) } : custom], ...(id === 'letters' ? { unlock: { requires: [letters] } } : {}), score: { unit: '个', lower: false, min: 0 }, hiddenPolicy: 'invalidate', inputs: ['pointer', 'touch', 'keyboard'], rule: '记住网格中符号的位置, 隐藏后按顺序点击. 错误只作提示, 直到全部找出.' });
 export const definition = { id: 'numbers', modes: [space('digits', '数字位置'), space('letters', '字母位置'), { id: 'first-click', name: '首击隐藏', ruleVersion: 2, presets: [{ id: 'standard', name: '4 个起', settings: { size: 5 } }], score: { unit: '关', lower: false, min: 0 }, hiddenPolicy: 'invalidate', inputs: ['pointer', 'touch', 'keyboard'], rule: '记住数字位置, 点击 1 后其余数字隐藏. 按升序点完, 共 3 次失误机会.' }] };
 
 export function makePositionRound(size, count, letters, random = Math.random) {
@@ -17,7 +22,7 @@ export function mount({ root, mode, preset, settings, onFinish, random = Math.ra
   const firstClick = mode.id === 'first-click';
   let count = firstClick ? 4 : settings.size ** 2, level = 0, lives = 3, round, roundTrial, next = 0, phase = 'show';
   const trials = [];
-  const finish = (value, reason) => runtime.finish({ value, detail: firstClick ? `完成 ${level} 关` : `依序找到 ${next} 个位置`, mode: mode.id, preset: preset.id, settings, rules: mode.ruleVersion, input: inputKind(), endReason: reason, scored: true, metrics: { found: next, completed: level, lives }, trials });
+  const finish = (value, reason) => runtime.finish({ unlocks: !firstClick && mode.id === 'digits' && preset.id === 'grid-3' ? [medium] : !firstClick && mode.id === 'digits' && preset.id === 'grid-4' ? [hard, letters] : [], value, detail: firstClick ? `完成 ${level} 关` : `依序找到 ${next} 个位置`, mode: mode.id, preset: preset.id, settings, rules: mode.ruleVersion, input: inputKind(), endReason: reason, scored: true, metrics: { found: next, completed: level, lives }, trials });
   const hide = (callback) => {
     phase = 'hiding';
     presentOnFrame(runtime, () => {
@@ -59,8 +64,12 @@ export function mount({ root, mode, preset, settings, onFinish, random = Math.ra
     roundTrial.responses.push(Number(cell.dataset.cell));
     if (Number(cell.dataset.cell) !== round[next].position) {
       roundTrial.correct = false;
+      if (!firstClick) {
+        cell.classList.add('incorrect');
+        runtime.later(() => cell.classList.remove('incorrect'), 300);
+        return;
+      }
       const fail = () => {
-        if (!firstClick) { phase = 'finished'; finish(next, 'mistake'); return; }
         lives--;
         if (!lives) { phase = 'finished'; finish(level, 'mistake'); return; }
         show();
