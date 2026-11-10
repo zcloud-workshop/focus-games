@@ -24,3 +24,25 @@ test('路径每步在棋盘内且终点由指令推导', () => {
   }
   assert.equal(path.end, row * 4 + column);
 });
+
+test('呈现时间使用两次动画帧并在清理后不再回调', async () => {
+  const { presentTimed } = await import('../src/engines/sequence.js');
+  const pending = [];
+  let active = true, recorded;
+  const runtime = { frame(fn) { pending.push(() => { if (active) fn(pending.length ? 116 : 100); }); }, later(fn) { pending.push(() => { if (active) fn(); }); } };
+  presentTimed(runtime, () => {}, 10, () => {}, (timing) => { recorded = timing; });
+  active = false;
+  while (pending.length) pending.shift()();
+  assert.equal(recorded, undefined);
+});
+
+test('呈现与隐藏的帧时间用于计算实际时长', async () => {
+  const { presentTimed } = await import('../src/engines/sequence.js');
+  const pending = []; let timestamp = 100, timing, visible = false;
+  const runtime = { frame(fn) { pending.push(() => fn(timestamp)); }, later(fn) { pending.push(fn); } };
+  presentTimed(runtime, () => { visible = true; }, 20, () => { visible = false; }, (value) => { timing = value; });
+  pending.shift()(); assert.equal(visible, true);
+  pending.shift()(); timestamp = 132;
+  pending.shift()(); assert.equal(visible, false);
+  assert.deepEqual(timing, { presentedAt: 100, durationMs: 32 });
+});
