@@ -1,3 +1,4 @@
+import { createInputTracker } from '../engines/input.js';
 import { shuffle } from '../core.js';
 import { createRuntime } from '../engines/runtime.js';
 
@@ -11,8 +12,8 @@ const presets = (sizes) => sizes.map(([columns, rows]) => ({ id: `${columns}x${r
 export const definition = {
   id: 'memory-match',
   modes: [
-    { id: 'symbols', name: '图形配对', ruleVersion: 2, presets: presets([[4, 4], [5, 4], [6, 4]]), fields: [{ key: 'theme', label: '主题', type: 'select', default: 'shapes', options: [{ value: 'shapes', label: '图形' }, { value: 'letters', label: '字母' }, { value: 'numbers', label: '数字' }] }], score: { unit: '秒', lower: true, min: 0 }, hiddenPolicy: 'invalidate', inputs: ['pointer', 'keyboard', 'touch'], rule: '每次翻开两张卡片, 找到全部相同的对子.' },
-    { id: 'animals', name: '动物配对', ruleVersion: 2, presets: presets([[3, 2], [4, 2], [4, 3], [4, 4]]), score: { unit: '秒', lower: true, min: 0 }, hiddenPolicy: 'invalidate', inputs: ['pointer', 'keyboard', 'touch'], rule: '每次翻开两张动物卡片, 找到全部相同的对子.' },
+    { id: 'symbols', name: '图形配对', ruleVersion: 3, presets: presets([[4, 4], [5, 4], [6, 4]]), fields: [{ key: 'theme', label: '主题', type: 'select', default: 'shapes', options: [{ value: 'shapes', label: '图形' }, { value: 'letters', label: '字母' }, { value: 'numbers', label: '数字' }] }], score: { unit: '秒', lower: true, min: 0 }, hiddenPolicy: 'invalidate', inputs: ['pointer', 'keyboard', 'touch'], rule: '每次翻开两张卡片, 找到全部相同的对子.' },
+    { id: 'animals', name: '动物配对', ruleVersion: 3, presets: presets([[3, 2], [4, 2], [4, 3], [4, 4]]), score: { unit: '秒', lower: true, min: 0 }, hiddenPolicy: 'invalidate', inputs: ['pointer', 'keyboard', 'touch'], rule: '每次翻开两张动物卡片, 找到全部相同的对子.' },
   ],
 };
 
@@ -28,6 +29,7 @@ function animal(index) {
 
 export function mount({ root, mode, preset, settings, onFinish, random = Math.random, clock = globalThis }) {
   const runtime = createRuntime({ onFinish, clock });
+  const inputKind = createInputTracker(runtime, root);
   const { columns, rows } = settings;
   const board = makeBoard(columns, rows, random);
   const theme = mode.id === 'animals' ? 'animals' : (settings.theme || 'shapes');
@@ -61,9 +63,9 @@ export function mount({ root, mode, preset, settings, onFinish, random = Math.ra
       locked = false;
       if (matched.size === board.length) {
         const seconds = (runtime.now() - started) / 1000;
-        runtime.finish({ value: seconds, detail: `完成 ${matched.size / 2} 对, 共 ${moves} 步`, mode: mode.id, preset: preset.id, settings: { ...settings, theme }, rules: mode.ruleVersion, input: 'mixed', endReason: 'completed', scored: true, metrics: { moves, pairs: matched.size / 2 } });
+        runtime.finish({ value: seconds, detail: `完成 ${matched.size / 2} 对, 共 ${moves} 步`, mode: mode.id, preset: preset.id, settings: { ...settings, theme }, rules: mode.ruleVersion, input: inputKind(), endReason: 'completed', scored: true, metrics: { moves, pairs: matched.size / 2 } });
       }
-    }, 700);
+    }, mode.id === 'animals' ? 550 : 650);
   });
   const started = runtime.now();
   return runtime.cleanup;
