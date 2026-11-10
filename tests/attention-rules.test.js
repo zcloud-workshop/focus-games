@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { choiceTrial, choiceMetrics } from '../src/engines/choices.js';
-import { inhibitionSummary } from '../src/engines/inhibition.js';
+import { choiceTrial, choiceMetrics, flankerSchedule } from '../src/engines/choices.js';
+import { inhibitionSummary, inhibitionUnlock } from '../src/engines/inhibition.js';
 import { pvtMetrics } from '../src/games/pvt.js';
 import { makeCard, matchCard } from '../src/games/card-sorting.js';
 import { definition as stopDefinition } from '../src/games/stop-signal.js';
@@ -13,7 +13,21 @@ test('数字比较不出现相等选项, 答案与数字大小一致', () => {
   for (let i = 0; i < 1000; i++) {
     const trial = choiceTrial('number-comparison', {}, random);
     assert.notEqual(trial.options[0], trial.options[1]);
+    assert.ok(trial.options.every((option) => Number(option) >= 10 && Number(option) <= 99));
+    assert.ok(Math.abs(Number(trial.options[0]) - Number(trial.options[1])) >= 2);
     assert.equal(trial.answer, Number(trial.options[1]) > Number(trial.options[0]) ? 1 : 0);
+  }
+});
+
+test('侧翼练习及正式试次按类型与方向平衡', () => {
+  const trials = flankerSchedule(seeded(42));
+  const practice = trials.slice(0, 4);
+  const formal = trials.slice(4);
+  assert.equal(practice.filter((trial) => trial.group === 'congruent').length, 2);
+  for (const [group, count] of [['congruent', 16], ['conflict', 16], ['neutral', 8]]) {
+    const groupTrials = formal.filter((trial) => trial.group === group);
+    assert.equal(groupTrials.length, count);
+    assert.equal(groupTrials.filter((trial) => trial.direction === 0).length, count / 2);
   }
 });
 
@@ -56,9 +70,25 @@ test('线索有效与无效比例两端按规则生成', () => {
   assert.notEqual(valid.cue, invalid.cue);
 });
 
+test('规则切换比例两端分别保持与切换上一规则', () => {
+  const same = choiceTrial('task-switching', { order: 'random', switchRate: 0 }, seeded(2), 1, '0');
+  const switched = choiceTrial('task-switching', { order: 'random', switchRate: 100 }, seeded(2), 1, '0');
+  assert.equal(same.group, '0');
+  assert.equal(switched.group, '1');
+});
+
 test('抑制任务分别统计漏按与误按', () => {
   const result = inhibitionSummary([{ stop: false, correct: false, response: null }, { stop: false, correct: true, response: 'press' }, { stop: true, correct: false, response: 'press' }, { stop: true, correct: true, response: null }]);
   assert.deepEqual(result, { goCorrect: 1, goTotal: 2, stopCorrect: 1, stopTotal: 2, omissions: 1, falseAlarms: 1 });
+});
+
+test('响应抑制只在对应预设达到门槛时解锁下一档', () => {
+  assert.deepEqual(inhibitionUnlock('gonogo', { id: 'beginner' }, { stopTotal: 20, stopCorrect: 16 }), []);
+  assert.deepEqual(inhibitionUnlock('gonogo', { id: 'beginner' }, { stopTotal: 20, stopCorrect: 17 }), ['gonogo|signals|standard']);
+  assert.deepEqual(inhibitionUnlock('gonogo', { id: 'standard' }, { stopTotal: 10, stopCorrect: 9 }), ['gonogo|signals|fast']);
+  assert.deepEqual(inhibitionUnlock('stop-signal', { id: 'beginner' }, { stopTotal: 5, stopCorrect: 4 }), ['stop-signal|stop|standard']);
+  assert.deepEqual(inhibitionUnlock('stop-signal', { id: 'standard' }, { stopTotal: 4, stopCorrect: 3 }), ['stop-signal|stop|fast']);
+  assert.deepEqual(inhibitionUnlock('sart', { id: 'beginner' }, { stopTotal: 10, stopCorrect: 10 }), []);
 });
 
 test('停止信号的延迟范围必须先于响应窗结束', () => {
@@ -75,6 +105,7 @@ test('警觉统计排除抢按并计算中位数与走神', () => {
   assert.equal(result.lapses, 1);
   assert.equal(result.fastest10Ms, 200);
   assert.equal(result.slowest10Ms, 600);
+  assert.equal(pvtMetrics([{ valid: true, responseMs: 500 }], 500).lapses, 1);
 });
 
 test('分类卡各规则恰有一个匹配选项', () => {
