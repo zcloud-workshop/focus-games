@@ -13,10 +13,10 @@ export const definition = {
         { key: 'minWait', label: '最短等待', type: 'number', default: 1.5, min: 0.5, max: 10, step: 0.1, unit: '秒' },
         { key: 'maxWait', label: '最长等待', type: 'number', default: 4.5, min: 0.5, max: 10, step: 0.1, unit: '秒' },
       ] },
-    ], validateSettings: (settings) => settings.minWait > settings.maxWait ? '最短等待不能大于最长等待.' : '', score: { unit: 'ms', lower: true, min: 0 }, hiddenPolicy: 'invalidate', inputs: ['pointer', 'keyboard'], rule: '点击开始, 变绿后响应. 可连续测量并在完成时保存平均值.' },
-    { id: 'single', name: '重复测量', ruleVersion: 2, presets: [{ id: 'default', name: '单次计时', settings: {} }], score: { unit: '秒', lower: true, min: 0 }, hiddenPolicy: 'invalidate', inputs: ['pointer', 'keyboard'], rule: '点击开始, 等待绿色信号, 再尽快响应. 点击继续可再次测量.' },
-    { id: 'color', name: '颜色反应', ruleVersion: 2, presets: [{ id: 'five', name: '5 次', settings: {} }], score: { unit: 'ms', lower: true, min: 0 }, hiddenPolicy: 'invalidate', inputs: ['pointer', 'keyboard'], rule: '等待颜色变绿后点击或按空格. 完成 5 次有效反应, 抢按后重新等待.' },
-    { id: 'start-lights', name: '起步灯', ruleVersion: 2, presets: [{ id: 'five', name: '连续 5 次', settings: {} }], score: { unit: '秒', lower: true, min: 0 }, hiddenPolicy: 'invalidate', inputs: ['pointer', 'keyboard'], rule: '等待五盏灯依次亮起并熄灭, 然后点击或按空格. 抢跑将重新累计 5 次.' },
+    ], validateSettings: (settings) => settings.minWait > settings.maxWait ? '最短等待不能大于最长等待.' : '', score: { unit: 'ms', lower: true, min: 0 }, hiddenPolicy: 'invalidate', inputs: ['pointer', 'touch', 'keyboard'], rule: '点击开始, 变绿后响应. 可连续测量并在完成时保存平均值.' },
+    { id: 'single', name: '重复测量', ruleVersion: 2, presets: [{ id: 'default', name: '单次计时', settings: {} }], score: { unit: '秒', lower: true, min: 0 }, hiddenPolicy: 'invalidate', inputs: ['pointer', 'touch', 'keyboard'], rule: '点击开始, 等待绿色信号, 再尽快响应. 点击继续可再次测量.' },
+    { id: 'color', name: '颜色反应', ruleVersion: 2, presets: [{ id: 'five', name: '5 次', settings: {} }], score: { unit: 'ms', lower: true, min: 0 }, hiddenPolicy: 'invalidate', inputs: ['pointer', 'touch', 'keyboard'], rule: '等待颜色变绿后点击或按空格. 完成 5 次有效反应, 抢按后重新等待.' },
+    { id: 'start-lights', name: '起步灯', ruleVersion: 2, presets: [{ id: 'five', name: '连续 5 次', settings: {} }], score: { unit: '秒', lower: true, min: 0 }, hiddenPolicy: 'invalidate', inputs: ['pointer', 'touch', 'keyboard'], rule: '等待五盏灯依次亮起并熄灭, 然后点击或按空格. 抢跑将重新累计 5 次.' },
   ],
 };
 
