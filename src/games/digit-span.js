@@ -6,7 +6,7 @@ import { createRuntime } from '../engines/runtime.js';
 const standard = (start, duration = 1000, gap = 250) => ({ id: `start-${start}`, name: `${start} 位起`, settings: { start, duration, gap } });
 const spanMode = (id, name, presets, extra = {}) => ({ id, name, ruleVersion: 2, presets, score: { unit: '位', lower: false, min: 0 }, hiddenPolicy: 'invalidate', inputs: ['keyboard', 'touch'], rule: '逐个观察数字, 在消失后输入完整序列.', ...extra });
 export const definition = { id: 'digit-span', modes: [
-  spanMode('standard', '数字广度', [standard(3), standard(5), standard(7)], { fields: [{ key: 'start', label: '起始位数', type: 'number', default: 3, min: 1, max: 12, step: 1 }, { key: 'duration', label: '每位时长', type: 'number', default: 1000, min: 300, max: 2000, step: 100, unit: '毫秒' }] }),
+  spanMode('standard', '数字广度', [standard(3, 1000, 200), { ...standard(5, 800, 200), unlock: { requires: ['digit-span:medium'] } }, { ...standard(7, 600, 200), unlock: { requires: ['digit-span:hard'] } }, { id: 'custom', name: '自定义', settings: { start: 3, duration: 1000, gap: 200 }, unlock: { requires: ['digit-span:medium'] }, fields: [{ key: 'start', label: '起始位数', type: 'number', min: 3, max: 3, step: 1, maxByUnlock: [{ key: 'digit-span:medium', max: 5 }, { key: 'digit-span:hard', max: 9 }] }, { key: 'duration', label: '每位时长', type: 'number', min: 1000, max: 1500, step: 100, unit: '毫秒', minByUnlock: [{ key: 'digit-span:medium', min: 800 }, { key: 'digit-span:hard', min: 600 }] }] }], { ruleVersion: 3 }),
   spanMode('forward', '正背', [standard(3, 700, 300)], { ruleVersion: 3 }),
   spanMode('backward', '倒背', [standard(3, 700, 300)], { ruleVersion: 3, rule: '逐个观察数字, 然后按倒序输入.' }),
   spanMode('example-forward', '正背例题', [standard(3, 700, 300)], { ruleVersion: 3, scored: false }),
@@ -16,6 +16,14 @@ export const definition = { id: 'digit-span', modes: [
 export function freshDigits(length, previous, random = Math.random) {
   const digits = randomDigits(length, random);
   return digits === previous ? digits.slice(0, -1) + ((Number(digits.at(-1)) + 1) % 10) : digits;
+}
+export function nonRepeatingDigits(length, random = Math.random) {
+  let digits = '';
+  for (let i = 0; i < length; i++) {
+    const options = '0123456789'.split('').filter((digit) => digit !== digits.at(-1));
+    digits += options[Math.floor(random() * options.length)];
+  }
+  return digits;
 }
 export function spanAnswer(digits, backward) { return backward ? [...digits].reverse().join('') : digits; }
 export function practiceSheets(random = Math.random) {
@@ -29,19 +37,20 @@ export function mount({ root, mode, preset, settings, onFinish, random = Math.ra
   const inputKind = createInputTracker(runtime, root);
   let length = settings.start, previous = '', digits = '', failures = 0, best = 0, phase = 'show', roundTrial;
   const trials = [];
+  const standardMode = mode.id === 'standard';
   const backward = mode.id.includes('backward');
   const example = mode.scored === false;
   const header = () => `<div class="game-status"><span>${length} 位 · ${backward ? '倒背' : '正背'}</span><button class="text-button" type="button" data-print>打印练习表</button></div>`;
   const show = () => {
     phase = 'show';
-    digits = example ? '418' : freshDigits(length, previous, random);
+    digits = example ? '418' : standardMode ? nonRepeatingDigits(length, random) : freshDigits(length, previous, random);
     previous = digits;
     roundTrial = { length, attempt: failures + 1, digits: [] };
     trials.push(roundTrial);
     root.innerHTML = header() + '<div class="stimulus" data-digit>·</div><p class="stage-note">观察数字</p>';
     let index = 0;
     const next = () => {
-      if (index === digits.length) { answer(); return; }
+      if (index === digits.length) { if (standardMode) runtime.later(answer, 400); else answer(); return; }
       const value = digits[index++];
       presentTimed(runtime, () => { root.querySelector('[data-digit]').textContent = value; }, settings.duration, () => { root.querySelector('[data-digit]').textContent = '·'; }, (timing) => {
         roundTrial.digits.push({ value, ...timing });
@@ -62,23 +71,39 @@ export function mount({ root, mode, preset, settings, onFinish, random = Math.ra
     const button = event.target.closest('[data-digit]');
     if (button && input.value.length < length) input.value += button.dataset.digit;
     if (event.target.closest('[data-clear]')) input.value = '';
+    if (standardMode && button && input.value.length === length) queueSubmit();
   });
-  runtime.listen(root, 'submit', (event) => {
-    event.preventDefault();
+  const queueSubmit = () => {
+    const input = root.querySelector('input');
+    const response = input.value;
+    runtime.later(() => { if (phase === 'answer' && input.isConnected && input.value === response && response.length === length) submit(); }, 300);
+  };
+  runtime.listen(root, 'input', (event) => {
+    if (standardMode && phase === 'answer' && event.target.matches('#span-answer') && event.target.value.length === length) queueSubmit();
+  });
+  const submit = () => {
     if (phase !== 'answer') return;
     const response = root.querySelector('input').value;
     if (response.length !== digits.length) return;
     const correct = response === spanAnswer(digits, backward);
     roundTrial.correct = correct;
     if (correct) best = length;
-    if (example || (!correct && ++failures >= (mode.id === 'standard' ? 1 : 2))) {
-      phase = 'finished';
-      runtime.finish({ value: best, detail: correct ? `完成 ${length} 位` : `最长成功 ${best} 位`, mode: mode.id, preset: preset.id, settings, rules: mode.ruleVersion, input: inputKind(), endReason: correct ? 'completed' : 'mistake', scored: !example, metrics: { best }, trials });
-      return;
-    }
-    if (correct) { length++; failures = 0; }
-    show();
-  });
+    phase = 'waiting';
+    const advance = () => {
+      if (example || (!correct && ++failures >= (standardMode ? 1 : 2))) {
+        phase = 'finished';
+        runtime.finish({ value: best, detail: correct ? `完成 ${length} 位` : `最长成功 ${best} 位`, mode: mode.id, preset: preset.id, settings, rules: mode.ruleVersion, input: inputKind(), endReason: correct ? 'completed' : 'mistake', scored: !example, metrics: { best }, trials, unlocks: standardMode ? [...(preset.id === 'start-3' && best >= 6 ? ['digit-span:medium'] : []), ...(preset.id === 'start-5' && best >= 8 ? ['digit-span:hard'] : [])] : [] });
+        return;
+      }
+      if (correct) { length++; failures = 0; }
+      show();
+    };
+    if (standardMode) {
+      root.querySelector('.number-form').insertAdjacentHTML('beforeend', `<p role="status">${correct ? '正确' : '错误'}</p>`);
+      runtime.later(advance, 800);
+    } else advance();
+  };
+  runtime.listen(root, 'submit', (event) => { event.preventDefault(); submit(); });
   show();
   return runtime.cleanup;
 }
