@@ -143,7 +143,7 @@ body:not(:has(.hero)) .training-section { padding-top: 65px; }
 .mini-breath span { position: absolute; width: 106px; height: 106px; border-radius: 50%; border: 1px solid var(--line); }
 .mini-breath span:nth-child(2) { width: 77px; height: 77px; background: var(--soft); }
 .mini-breath span:nth-child(3) { width: 44px; height: 44px; background: var(--accent); border: 0; opacity: .75; }
-.footer { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--line); padding: 24px 0 30px; color: var(--muted); font-size: 11px; }
+.footer { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; border-top: 1px solid var(--line); padding: 24px 0 30px; color: var(--muted); font-size: 11px; }
 .footer a { display: inline-flex; align-items: center; gap: 4px; }
 .footer .icon { width: 11px; height: 11px; }
 .page-heading { padding: 62px 0 35px; }
