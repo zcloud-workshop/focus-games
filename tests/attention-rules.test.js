@@ -4,6 +4,7 @@ import { choiceTrial, choiceMetrics } from '../src/engines/choices.js';
 import { inhibitionSummary } from '../src/engines/inhibition.js';
 import { pvtMetrics } from '../src/games/pvt.js';
 import { makeCard, matchCard } from '../src/games/card-sorting.js';
+import { definition as stopDefinition } from '../src/games/stop-signal.js';
 
 function seeded(seed) { return () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 2 ** 32; }; }
 
@@ -58,6 +59,13 @@ test('线索有效与无效比例两端按规则生成', () => {
 test('抑制任务分别统计漏按与误按', () => {
   const result = inhibitionSummary([{ stop: false, correct: false, response: null }, { stop: false, correct: true, response: 'press' }, { stop: true, correct: false, response: 'press' }, { stop: true, correct: true, response: null }]);
   assert.deepEqual(result, { goCorrect: 1, goTotal: 2, stopCorrect: 1, stopTotal: 2, omissions: 1, falseAlarms: 1 });
+});
+
+test('停止信号的延迟范围必须先于响应窗结束', () => {
+  const validate = stopDefinition.modes[0].validateSettings;
+  assert.equal(validate({ delayMin: 150, delayMax: 400, window: 1200 }), '');
+  assert.ok(validate({ delayMin: 400, delayMax: 150, window: 1200 }));
+  assert.ok(validate({ delayMin: 150, delayMax: 1200, window: 1200 }));
 });
 
 test('警觉统计排除抢按并计算中位数与走神', () => {
