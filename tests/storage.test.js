@@ -1,10 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { games } from '../src/core.js';
+import { legacyRules } from '../src/core.js';
 import {
   STORAGE_KEY, LEGACY_KEY, DATA_VERSION, RECORD_LIMIT, TRIAL_SESSIONS, CLASSIC_MODE, CLASSIC_RULES,
   createStore, createId, emptyData, readData, writeData, addRecord, setFavorite, bestKey, classicBestKey, bestFor,
-  visibleRecords, isUnlocked, markUnlocked, exportData,
+  visibleRecords, visibleBests, visibleTools, isUnlocked, markUnlocked, exportData, registerDefinition, addToolRecord,
 } from '../src/storage.js';
 
 function memoryStorage(initial = {}, { quota = Infinity } = {}) {
@@ -26,7 +26,7 @@ function memoryStorage(initial = {}, { quota = Infinity } = {}) {
 
 // 基线版本 (27010eb) 的读取和写入逻辑, 模拟仍在运行旧版本的标签页.
 function legacyTab(storage) {
-  const known = games.map((game) => game.id);
+  const known = Object.keys(legacyRules);
   const read = () => {
     const data = JSON.parse(storage.getItem(LEGACY_KEY) || '{}');
     return {
@@ -47,7 +47,7 @@ const utc = (hour, minute = 0) => new Date(Date.UTC(2026, 10, 10, hour, minute))
 const v1Record = (game, value, level = 0, at = utc(4)) => ({ game, value, level, duration: 30, at: at.toISOString() });
 let clock = Date.UTC(2026, 10, 10, 6);
 function classicRecord(game, value, extra = {}) {
-  const config = games.find((item) => item.id === game);
+  const config = legacyRules[game];
   clock += 60_000;
   return { id: createId(clock), game, mode: CLASSIC_MODE, rules: CLASSIC_RULES, level: 0, label: config.levels[0], value, unit: config.unit, duration: 30, at: new Date(clock).toISOString(), ...extra };
 }
@@ -55,8 +55,28 @@ const stored = (storage) => JSON.parse(storage.getItem(STORAGE_KEY));
 // 写入操作可能被重放, 记录在操作外创建, 保持同一 ID.
 function save(game, value, extra) {
   const record = classicRecord(game, value, extra);
-  return (data) => addRecord(data, record, { key: classicBestKey(game, 0), lower: games.find((item) => item.id === game).lower });
+  return (data) => addRecord(data, record, { key: classicBestKey(game, 0), lower: legacyRules[game].lower });
 }
+
+test('新规则保留负分、预设范围和独立成绩分组, 工具不写训练记录', () => {
+  registerDefinition({ id: 'quick-mirror-judgment', modes: [{ id: 'timed', ruleVersion: 2, score: { min: -100, max: 100 }, presets: [{ id: 'wide', score: { min: -200, max: 200 } }] }] });
+  const data = emptyData();
+  const record = { id: 'negative', game: 'quick-mirror-judgment', mode: 'timed', rules: 2, preset: 'wide', settings: { seconds: 120 }, input: 'keyboard', duration: 120, value: -150, at: utc(6).toISOString() };
+  const key = bestKey(record);
+  addRecord(data, record, { key, score: { min: -200, max: 200 } });
+  assert.equal(visibleRecords(data.records).length, 1);
+  assert.equal(bestFor(data, key).value, -150);
+  assert.notEqual(key, bestKey({ ...record, input: 'touch' }));
+  assert.notEqual(key, bestKey({ ...record, mode: 'other' }));
+  assert.notEqual(key, bestKey({ ...record, settings: { seconds: 60 } }));
+  assert.notEqual(bestKey({ ...record, config: 'a' }), bestKey({ ...record, config: 'b' }));
+  assert.throws(() => addRecord(data, { ...record, id: 'invalid', value: -201 }, { score: { min: -200, max: 200 } }), RangeError);
+  const tool = { id: 'tool-session', game: 'pomodoro', duration: 1500, at: utc(7).toISOString() };
+  addToolRecord(data, tool);
+  addToolRecord(data, tool);
+  assert.equal(data.tools.length, 1);
+  assert.equal(data.records.length, 1);
+});
 
 test('首次读取从 v1 迁移记录和收藏, v1 保持原样', () => {
   const v1 = { records: [v1Record('schulte', 10), v1Record('schulte', 8, 0, utc(5)), v1Record('stroop', 95, 1, utc(6))], favorites: ['schulte', 'stroop'] };
@@ -144,12 +164,12 @@ test('每次写入前重新读取, 两个标签页的记录和收藏都保留', 
 
 test('保留无法识别的记录、字段和最佳, 只在展示时跳过', () => {
   const future = { id: 'future-1', game: 'pvt', mode: 'pvt-b', rules: 1, value: 280, unit: 'ms', duration: 180, at: '2026-11-10T01:00:00.000Z', metrics: { lapses: 1 } };
-  const revised = { ...classicRecord('reaction', 240), mode: 'start-lights', rules: 2 };
+  const revised = { ...classicRecord('reaction', 240), mode: 'future-mode', rules: 2 };
   const extra = { ...classicRecord('schulte', 12), note: 'kept' };
   const initial = { version: 2, records: [null, future, revised, extra], favorites: ['pvt', 'schulte'], bests: { 'pvt|pvt-b|1|null|any': { value: 280 } }, profile: { goal: 3 }, legacy: { seen: [], favorites: [], note: 'kept' } };
   const storage = memoryStorage({ [STORAGE_KEY]: initial });
   const store = createStore(() => storage);
-  assert.deepEqual(visibleRecords(store.load().records), [extra]);
+  assert.deepEqual(visibleRecords(store.load().records), [{ ...extra, lower: true, oldRule: true }]);
   store.mutate(save('stroop', 80));
   const saved = stored(storage);
   assert.deepEqual(saved.records.slice(0, 4), initial.records);
@@ -301,5 +321,68 @@ test('最佳成绩键按设置内容分组, 与字段顺序无关, 并区分输�
 test('按经典规则的合法值域过滤展示记录', () => {
   const valid = [classicRecord('color', 100), classicRecord('sequence', 20), classicRecord('reaction', 0)];
   const invalid = [classicRecord('color', 101), classicRecord('sequence', 21), classicRecord('schulte', -1), { ...classicRecord('schulte', 9), level: 3 }, { ...classicRecord('schulte', 9), at: 'invalid' }, { ...classicRecord('schulte', 9), duration: -1 }];
-  assert.deepEqual(visibleRecords([...valid, ...invalid]), valid);
+  assert.deepEqual(visibleRecords([...valid, ...invalid]), valid.map((record) => ({ ...record, lower: legacyRules[record.game].lower, oldRule: true })));
+});
+
+
+test('已知旧版按历史值域展示, 不信任记录中的单位或比较方向', () => {
+  registerDefinition({ id: 'object-recall', modes: [{ id: 'free-recall', ruleVersion: 3, score: { unit: '个', lower: false, min: 0, max: 12 }, presets: [{ id: 'standard' }] }] });
+  registerDefinition({ id: 'posner-cue', modes: [{ id: 'cue', ruleVersion: 3, score: { unit: 'ms', lower: true, min: 0 }, presets: [{ id: '70' }] }] });
+  registerDefinition({ id: 'sequence', modes: [{ id: 'path', ruleVersion: 3, score: { unit: '分', lower: false, min: 0 }, presets: [{ id: 'standard' }] }] });
+  const base = { id: 'old', game: 'object-recall', mode: 'free-recall', rules: 2, preset: 'standard', value: 12, unit: '错误单位', lower: true, duration: 8, at: utc(6).toISOString() };
+  const cue = { ...base, game: 'posner-cue', mode: 'cue', value: 85 };
+  const path = { ...base, game: 'sequence', mode: 'path', value: 4 };
+  const removed = { ...base, game: 'count-boxes', mode: 'levels', value: 6 };
+  const records = [base, cue, path, removed, { ...base, value: 13 }, { ...cue, value: 101 }, { ...base, rules: 4 }, { ...base, mode: 'unknown' }, { ...base, game: 'future-game' }];
+  const result = visibleRecords(records);
+  assert.equal(result.length, 4);
+  assert.deepEqual(result.map(({ unit, lower, oldRule }) => ({ unit, lower, oldRule })), [
+    { unit: '个', lower: false, oldRule: true },
+    { unit: '%', lower: false, oldRule: true },
+    { unit: '个', lower: false, oldRule: true },
+    { unit: '关', lower: false, oldRule: true },
+  ]);
+  assert.equal(records[0].unit, '错误单位');
+  assert.equal(records[0].lower, true);
+  const current = visibleRecords([{ ...base, rules: 3, unit: '伪造', lower: true }]);
+  assert.equal(current[0].unit, '个');
+  assert.equal(current[0].lower, false);
+});
+
+test('列举旧版与当前最佳并补全展示元数据, 不改持久化对象', () => {
+  registerDefinition({ id: 'object-recall', modes: [{ id: 'free-recall', ruleVersion: 3, score: { unit: '个', lower: false, min: 0, max: 12 }, presets: [{ id: 'standard' }] }] });
+  const data = emptyData();
+  const legacy = { value: 8, unit: '伪造', lower: false, record: 'old-id', at: utc(6).toISOString(), label: '3 × 3' };
+  const key = classicBestKey('schulte', 0);
+  data.bests[key] = legacy;
+  const old = { id: 'v2', game: 'object-recall', mode: 'free-recall', rules: 2, preset: 'standard', value: 9, unit: '伪造', lower: true, duration: 4, at: utc(6).toISOString() };
+  data.bests[bestKey(old)] = old;
+  const current = { ...old, id: 'v3', rules: 3, value: 10, unit: '个', lower: false };
+  data.bests[bestKey(current)] = current;
+  data.bests['unknown|classic|1|L0|any'] = legacy;
+  data.bests['schulte|classic|1|L3|any'] = legacy;
+  data.bests['schulte|classic|1|L-1|any'] = legacy;
+  data.bests['future'] = { ...current, rules: 4 };
+  const list = visibleBests(data);
+  assert.equal(list.length, 3);
+  assert.deepEqual(list.map(({ game, mode, rules, unit, lower, oldRule }) => ({ game, mode, rules, unit, lower, oldRule })), [
+    { game: 'schulte', mode: 'classic', rules: 1, unit: '秒', lower: true, oldRule: true },
+    { game: 'object-recall', mode: 'free-recall', rules: 2, unit: '个', lower: false, oldRule: true },
+    { game: 'object-recall', mode: 'free-recall', rules: 3, unit: '个', lower: false, oldRule: undefined },
+  ]);
+  assert.equal(list[0].level, 0);
+  assert.deepEqual(data.bests[key], legacy);
+  assert.equal(Object.hasOwn(legacy, 'game'), false);
+});
+
+test('工具只展示已知合法记录, 原始未知记录与工具状态字段保留', () => {
+  const at = utc(6).toISOString();
+  const records = [null, { game: 'pomodoro', minutes: 25, duration: 1500, at }, { game: 'bamboo-cicada', turns: 0, duration: 10, at }, { game: 'pomodoro', minutes: -1, duration: 2, at }, { game: 'bamboo-cicada', turns: Infinity, duration: 3, at }, { game: 'other', duration: 2, at }, { game: 'pomodoro', minutes: 5, duration: -1, at }, { game: 'pomodoro', minutes: 5, duration: 2, at: 'bad' }, { game: 'pomodoro', minutes: 5, duration: 2, at: 0 }];
+  assert.deepEqual(visibleTools(records), records.slice(1, 3));
+  assert.deepEqual(visibleTools(null), []);
+  const data = readData(memoryStorage({ [STORAGE_KEY]: { ...emptyData(), tools: records, toolState: { pomodoro: { running: true }, other: { preserved: true } } } })).data;
+  assert.equal(data.tools.length, records.length);
+  assert.deepEqual(data.toolState.other, { preserved: true });
+  assert.deepEqual(readData(memoryStorage({ [STORAGE_KEY]: { toolState: null } })).data.toolState, {});
+  assert.deepEqual(readData(memoryStorage({ [STORAGE_KEY]: { toolState: ['bad'] } })).data.toolState, {});
 });
