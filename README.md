@@ -9,6 +9,7 @@
 - 三档难度、分类和搜索、收藏、每日三项挑战.
 - 本地成绩、按项目和难度区分的个人最佳、7 天记录及 JSON 导出.
 - 手机和桌面布局、键盘操作和减少动态效果支持.
+- 简约黑白界面, 明亮和深色两种主题, 自动记住选择.
 
 网站使用原生 JavaScript 和 CSS, Vite 生成静态资源, Cloudflare Workers Static Assets 托管. 没有后端、登录或第三方运行时资源依赖.
 
@@ -32,6 +33,8 @@ pnpm exec wrangler deploy --dry-run
 ```
 
 `dist/` 为构建产物, 不提交到 Git. 根目录 `wrangler.jsonc` 配置 `assets.directory` 和 SPA 回退, 不需要 Worker 脚本或额外数据库绑定.
+
+版本预览使用 `https://<版本前缀>-focus-games.icoco.workers.dev`, 每次成功构建后对应独立版本. 生产流量比例不影响访问该版本的预览地址.
 
 ## GitHub 推送后自动部署
 
