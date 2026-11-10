@@ -10,7 +10,7 @@ export function makeCard(random = Math.random) {
 }
 export function matchCard(card, rule, option) { return card[rule] === option; }
 
-export const definition = { id: 'card-sorting', modes: [{ id: 'hidden-rule', name: '发现分类规则', ruleVersion: 2, presets: [30, 40, 60].map((count) => ({ id: String(count), name: `${count} 题`, settings: { count, streak: 10 } })).concat({ id: 'custom', name: '自定义', settings: { count: 40, streak: 10 }, fields: [{ key: 'count', label: '题数', type: 'number', default: 40, min: 10, max: 100, step: 1 }] }), score: { unit: '%', lower: false, min: 0, max: 100 }, hiddenPolicy: 'invalidate', inputs: ['pointer', 'touch', 'keyboard'], rule: '根据对错反馈发现卡片的匹配规则. 规则会在练习中改变.' }] };
+export const definition = { id: 'card-sorting', modes: [{ id: 'hidden-rule', name: '发现分类规则', ruleVersion: 3, presets: [30, 40, 60].map((count) => ({ id: String(count), name: `${count} 题`, settings: { count, streak: 5 } })).concat({ id: 'custom', name: '自定义', settings: { count: 40, streak: 5 }, fields: [{ key: 'count', label: '题数', type: 'number', default: 40, min: 10, max: 100, step: 1 }] }), score: { unit: '组', lower: false, min: 0 }, hiddenPolicy: 'invalidate', inputs: ['pointer', 'touch', 'keyboard'], rule: '根据对错反馈发现卡片的匹配规则. 规则会在练习中改变.' }] };
 
 export function mount({ root, mode = definition.modes[0], preset = mode.presets[0], settings = preset.settings, onFinish, random = Math.random, clock = globalThis }) {
   const runtime = createRuntime({ onFinish, clock });
@@ -28,7 +28,7 @@ export function mount({ root, mode = definition.modes[0], preset = mode.presets[
   const show = () => {
     if (trials.length === values.count) {
       const correct = trials.filter((trial) => trial.correct).length;
-      runtime.finish({ value: Math.round(correct / trials.length * 100), detail: `${trials.length} 题中答对 ${correct} 题, 完成 ${categories} 组分类`, mode: mode.id, preset: preset.id, settings: values, rules: mode.ruleVersion, input: inputs.value, endReason: 'completed', scored: true, metrics: { correct, errors: trials.length - correct, categories, perseverativeErrors: trials.filter((trial) => trial.perseverative).length }, trials });
+      runtime.finish({ value: categories, detail: `${trials.length} 题中答对 ${correct} 题, 完成 ${categories} 组分类`, mode: mode.id, preset: preset.id, settings: values, rules: mode.ruleVersion, input: inputs.value, endReason: 'completed', scored: true, metrics: { correct, errors: trials.length - correct, categories, perseverativeErrors: trials.filter((trial) => trial.perseverative).length }, trials });
       return;
     }
     current = makeCard(random);
