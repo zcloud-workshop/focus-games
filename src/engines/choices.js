@@ -4,6 +4,13 @@ import { shuffle } from '../core.js';
 
 const colors = [{ name: '红', css: '#c44343' }, { name: '蓝', css: '#3275bf' }, { name: '绿', css: '#27805e' }, { name: '紫', css: '#8d53b1' }, { name: '橙', css: '#b86b14' }, { name: '黑', css: '#333333' }];
 const pick = (items, random) => items[Math.floor(random() * items.length)];
+export const choiceFields = {
+  count: { key: 'count', label: '题数', type: 'number', default: 30, min: 10, max: 100, step: 1 },
+  window: { key: 'window', label: '响应窗', type: 'number', default: 2000, min: 300, max: 10000, step: 100, unit: '毫秒' },
+  colors: { key: 'colors', label: '颜色数', type: 'number', default: 3, min: 3, max: 6, step: 1 },
+  arrows: { key: 'arrows', label: '箭头数', type: 'select', default: 5, options: [3, 5, 7].map((value) => ({ value, label: String(value) })) },
+  validRate: { key: 'validRate', label: '有效线索', type: 'number', default: 80, min: 10, max: 90, step: 5, unit: '%' },
+};
 
 export function choiceTrial(kind, settings, random = Math.random, index = 0) {
   const direction = random() < 0.5 ? 0 : 1;
