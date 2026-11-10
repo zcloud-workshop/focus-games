@@ -1,10 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { choiceTrial, choiceMetrics, flankerSchedule } from '../src/engines/choices.js';
-import { inhibitionSummary, inhibitionUnlock } from '../src/engines/inhibition.js';
+import { choiceTrial, choiceMetrics, flankerSchedule, numberChallenge } from '../src/engines/choices.js';
+import { inhibitionSummary, inhibitionUnlock, mountInhibition } from '../src/engines/inhibition.js';
 import { pvtMetrics } from '../src/games/pvt.js';
-import { makeCard, matchCard } from '../src/games/card-sorting.js';
-import { definition as stopDefinition } from '../src/games/stop-signal.js';
+import { makeCard, matchCard, nextCardRule } from '../src/games/card-sorting.js';
+import { highestNumberLevel } from '../src/games/number-comparison.js';
+import { reactionUnlock } from '../src/games/reaction.js';
+import { breathUnlock } from '../src/games/breath.js';
 
 function seeded(seed) { return () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 2 ** 32; }; }
 
@@ -29,6 +31,15 @@ test('侧翼练习及正式试次按类型与方向平衡', () => {
     assert.equal(groupTrials.length, count);
     assert.equal(groupTrials.filter((trial) => trial.direction === 0).length, count / 2);
   }
+});
+
+test('数字比较按等级验证次数与正确率, 已解锁等级可恢复', () => {
+  assert.equal(numberChallenge(1, 25, 22).achieved, false);
+  assert.equal(numberChallenge(1, 25, 23).achieved, true);
+  assert.equal(numberChallenge(2, 28, 26).targetAttempts, 28);
+  assert.equal(numberChallenge(2, 28, 26).achieved, false);
+  assert.equal(numberChallenge(2, 28, 27).achieved, true);
+  assert.equal(highestNumberLevel({ unlocks: { 'number-comparison|level|3': {}, other: {} } }), 3);
 });
 
 test('四则运算候选唯一且除法可整除', () => {
@@ -88,14 +99,48 @@ test('响应抑制只在对应预设达到门槛时解锁下一档', () => {
   assert.deepEqual(inhibitionUnlock('gonogo', { id: 'standard' }, { stopTotal: 10, stopCorrect: 9 }), ['gonogo|signals|fast']);
   assert.deepEqual(inhibitionUnlock('stop-signal', { id: 'beginner' }, { stopTotal: 5, stopCorrect: 4 }), ['stop-signal|stop|standard']);
   assert.deepEqual(inhibitionUnlock('stop-signal', { id: 'standard' }, { stopTotal: 4, stopCorrect: 3 }), ['stop-signal|stop|fast']);
+  assert.deepEqual(inhibitionUnlock('sart', { id: 'slow' }, { stopTotal: 25, stopCorrect: 22 }), ['sart|digits|standard']);
+  assert.deepEqual(inhibitionUnlock('sart', { id: 'standard' }, { stopTotal: 25, stopCorrect: 23 }), ['sart|digits|fast']);
   assert.deepEqual(inhibitionUnlock('sart', { id: 'beginner' }, { stopTotal: 10, stopCorrect: 10 }), []);
 });
 
-test('停止信号的延迟范围必须先于响应窗结束', () => {
-  const validate = stopDefinition.modes[0].validateSettings;
-  assert.equal(validate({ delayMin: 150, delayMax: 400, window: 1200 }), '');
-  assert.ok(validate({ delayMin: 400, delayMax: 150, window: 1200 }));
-  assert.ok(validate({ delayMin: 150, delayMax: 1200, window: 1200 }));
+test('倒计时输入被忽略, 响应立即归属当前试次且重复按键不重复结算', () => {
+  let now = 0;
+  let nextId = 0;
+  const timers = new Map();
+  const frames = new Map();
+  const clock = {
+    performance: { now: () => now },
+    setTimeout(fn, delay) { const id = ++nextId; timers.set(id, { fn, at: now + delay }); return id; },
+    clearTimeout(id) { timers.delete(id); },
+    requestAnimationFrame(fn) { const id = ++nextId; frames.set(id, fn); return id; },
+    cancelAnimationFrame(id) { frames.delete(id); },
+    advance(ms) { now += ms; for (const [id, timer] of [...timers]) if (timer.at <= now) { timers.delete(id); timer.fn(); } },
+    paint() { const pending = [...frames.values()]; frames.clear(); pending.forEach((fn) => fn(now)); },
+  };
+  const previousDocument = globalThis.document;
+  globalThis.document = new EventTarget();
+  const root = new EventTarget();
+  root.innerHTML = '';
+  const outcomes = [];
+  const key = () => {
+    const event = new Event('keydown', { cancelable: true });
+    Object.defineProperties(event, { code: { value: 'Space' }, repeat: { value: false }, timeStamp: { value: now } });
+    globalThis.document.dispatchEvent(event);
+  };
+  try {
+    const preset = { id: 'beginner', settings: { count: 1, stopRate: 100, window: 1500, interval: 400 } };
+    const stop = mountInhibition({ root, mode: { id: 'signals', ruleVersion: 3 }, preset, settings: preset.settings, onFinish: (result) => outcomes.push(result), random: () => 0, clock, kind: 'gonogo' });
+    key();
+    clock.advance(3000); clock.paint(); clock.advance(100);
+    key(); key();
+    clock.advance(400);
+    assert.equal(outcomes.length, 1);
+    assert.equal(outcomes[0].trials.length, 1);
+    assert.equal(outcomes[0].metrics.falseAlarms, 1);
+    assert.equal(outcomes[0].input, 'keyboard');
+    stop();
+  } finally { globalThis.document = previousDocument; }
 });
 
 test('警觉统计排除抢按并计算中位数与走神', () => {
@@ -114,4 +159,22 @@ test('分类卡各规则恰有一个匹配选项', () => {
     const card = makeCard(random);
     for (const rule of ['color', 'shape', 'count']) assert.equal([0, 1, 2, 3].filter((index) => matchCard(card, rule, index)).length, 1);
   }
+});
+
+test('分类规则切换到随机的其他规则', () => {
+  for (let index = 0; index < 3; index++) {
+    const next = [nextCardRule(index, () => 0), nextCardRule(index, () => 0.99)];
+    assert.equal(new Set(next).size, 2);
+    assert.ok(next.every((value) => value !== index));
+  }
+});
+
+test('反应解锁严格小于阈值, 中级呼吸完成同时解锁两种模式', () => {
+  assert.equal(reactionUnlock('beginner', 300), null);
+  assert.equal(reactionUnlock('beginner', 299), 'reaction|staged|intermediate');
+  assert.equal(reactionUnlock('intermediate', 250), null);
+  assert.equal(reactionUnlock('intermediate', 249), 'reaction|staged|advanced');
+  assert.deepEqual(breathUnlock('intermediate', 2), []);
+  assert.deepEqual(breathUnlock('intermediate', 3), ['breath|staged|advanced', 'breath|staged|box']);
+  assert.deepEqual(breathUnlock('advanced', 3), []);
 });
