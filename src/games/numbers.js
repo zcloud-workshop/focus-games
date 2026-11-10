@@ -1,5 +1,7 @@
+import { createInputTracker } from '../engines/input.js';
 import { uniquePositions } from '../engines/sequence.js';
 import { createRuntime } from '../engines/runtime.js';
+import { presentOnFrame } from '../engines/trials.js';
 
 const presets = [3, 4, 5].map((size) => ({ id: `grid-${size}`, name: `${size} × ${size}`, settings: { size, duration: 4000 } }));
 const space = (id, name) => ({ id, name, ruleVersion: 2, presets, fields: [{ key: 'duration', label: '记忆时间', type: 'number', default: 4000, min: 1000, max: 15000, step: 500, unit: '毫秒' }], score: { unit: '个', lower: false, min: 0 }, hiddenPolicy: 'invalidate', inputs: ['pointer', 'touch', 'keyboard'], rule: '记住网格中符号的位置, 隐藏后按顺序点击.' });
@@ -11,34 +13,63 @@ export function makePositionRound(size, count, letters, random = Math.random) {
 
 export function mount({ root, mode, preset, settings, onFinish, random = Math.random, clock = globalThis }) {
   const runtime = createRuntime({ onFinish, clock });
+  const inputKind = createInputTracker(runtime, root);
   const firstClick = mode.id === 'first-click';
-  let count = firstClick ? 4 : settings.size ** 2, level = 0, lives = 3, round, next = 0, phase = 'show';
-  const finish = (value, reason) => runtime.finish({ value, detail: firstClick ? `完成 ${level} 关` : `依序找到 ${next} 个位置`, mode: mode.id, preset: preset.id, settings, rules: mode.ruleVersion, input: 'mixed', endReason: reason, scored: true, metrics: { found: next, completed: level, lives } });
+  let count = firstClick ? 4 : settings.size ** 2, level = 0, lives = 3, round, roundTrial, next = 0, phase = 'show';
+  const trials = [];
+  const finish = (value, reason) => runtime.finish({ value, detail: firstClick ? `完成 ${level} 关` : `依序找到 ${next} 个位置`, mode: mode.id, preset: preset.id, settings, rules: mode.ruleVersion, input: inputKind(), endReason: reason, scored: true, metrics: { found: next, completed: level, lives }, trials });
+  const hide = (callback) => {
+    phase = 'hiding';
+    presentOnFrame(runtime, () => {
+      root.querySelectorAll('[data-cell]').forEach((cell) => { cell.textContent = ''; });
+      root.querySelector('[data-hint]').textContent = '按顺序找出位置';
+    }, (hiddenAt) => {
+      roundTrial.durationMs = hiddenAt - roundTrial.presentedAt;
+      callback();
+    });
+  };
   const show = () => {
     round = makePositionRound(settings.size, count, mode.id === 'letters', random);
+    roundTrial = { level: level + 1, positions: round.map((item) => item.position), responses: [] };
+    trials.push(roundTrial);
     next = 0;
-    phase = firstClick ? 'first' : 'show';
-    root.innerHTML = `<div class="game-status"><span>${firstClick ? `第 ${level + 1} 关 · 余 ${lives} 次` : '观察位置'}</span><span data-hint>${firstClick ? '先点击 1' : '稍后按顺序点击'}</span></div><div class="play-grid number-grid" style="--columns:${settings.size}">${Array.from({ length: settings.size ** 2 }, (_, index) => `<button type="button" class="play-cell" data-cell="${index}" aria-label="位置 ${index + 1}">${round.find((item) => item.position === index)?.label ?? ''}</button>`).join('')}</div>`;
-    if (!firstClick) runtime.later(() => { phase = 'answer'; root.querySelectorAll('[data-cell]').forEach((cell) => { cell.textContent = ''; }); root.querySelector('[data-hint]').textContent = '按顺序找出位置'; }, settings.duration);
+    phase = 'show';
+    presentOnFrame(runtime, () => {
+      root.innerHTML = `<div class="game-status"><span>${firstClick ? `第 ${level + 1} 关 · 余 ${lives} 次` : '观察位置'}</span><span data-hint>${firstClick ? '先点击 1' : '稍后按顺序点击'}</span></div><div class="play-grid number-grid" style="--columns:${settings.size}">${Array.from({ length: settings.size ** 2 }, (_, index) => `<button type="button" class="play-cell" data-cell="${index}" aria-label="位置 ${index + 1}">${round.find((item) => item.position === index)?.label ?? ''}</button>`).join('')}</div>`;
+    }, (shownAt) => {
+      roundTrial.presentedAt = shownAt;
+      if (firstClick) phase = 'first';
+      else runtime.later(() => hide(() => { phase = 'answer'; }), settings.duration);
+    });
   };
-  runtime.listen(root, 'click', (event) => {
-    const cell = event.target.closest('[data-cell]');
-    if (!cell || !['first', 'answer'].includes(phase)) return;
-    if (Number(cell.dataset.cell) !== round[next].position) {
-      if (!firstClick) { phase = 'finished'; finish(next, 'mistake'); return; }
-      lives--;
-      if (!lives) { phase = 'finished'; finish(level, 'mistake'); return; }
-      show(); return;
-    }
-    if (phase === 'first') { phase = 'answer'; root.querySelectorAll('[data-cell]').forEach((item) => { item.textContent = ''; }); root.querySelector('[data-hint]').textContent = '继续按顺序点击'; }
+  const accept = (cell) => {
     cell.textContent = round[next].label;
     cell.disabled = true;
     next++;
     if (next !== count) return;
+    roundTrial.correct = true;
     if (!firstClick) { phase = 'finished'; finish(next, 'completed'); return; }
     level++;
     if (count === settings.size ** 2) { phase = 'finished'; finish(level, 'completed'); return; }
     count++; phase = 'waiting'; runtime.later(show, 500);
+  };
+  runtime.listen(root, 'click', (event) => {
+    const cell = event.target.closest('[data-cell]');
+    if (!cell || !['first', 'answer'].includes(phase)) return;
+    roundTrial.responses.push(Number(cell.dataset.cell));
+    if (Number(cell.dataset.cell) !== round[next].position) {
+      roundTrial.correct = false;
+      const fail = () => {
+        if (!firstClick) { phase = 'finished'; finish(next, 'mistake'); return; }
+        lives--;
+        if (!lives) { phase = 'finished'; finish(level, 'mistake'); return; }
+        show();
+      };
+      if (phase === 'first') hide(fail); else fail();
+      return;
+    }
+    if (phase === 'first') hide(() => { phase = 'answer'; accept(cell); });
+    else accept(cell);
   });
   show();
   return runtime.cleanup;
