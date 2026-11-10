@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { addMergeTile, canMergeMove, createLights, createMaze, createSliding, matchingPositions, mergeLine, moveMaze, moveMerge, moveSliding, slidingNeighbors, solveLights, solvedSliding, swapAdjacent, toggleLights } from '../src/engines/boards.js';
+import { addMergeTile, canMergeMove, createLights, createMaze, createSliding, matchingPositions, mergeLine, moveMaze, moveMerge, moveSliding, rateSudoku, slidingNeighbors, solveLights, solveSudoku, solvedSliding, swapAdjacent, toggleLights } from '../src/engines/boards.js';
+import { createSudoku } from '../src/games/sudoku.js';
 
 test('数字合并一回合中每个方块最多参与一次合并', () => {
   assert.deepEqual(mergeLine([2, 2, 2, 2]), { line: [4, 4, 0, 0], score: 8 });
@@ -19,6 +20,21 @@ test('拼图相邻交换可逆且不越过边界', () => {
   assert.equal(swapAdjacent([0, 1, 2], 0, -1), null);
   assert.equal(swapAdjacent([0, 1, 2], 2, 1), null);
   assert.deepEqual(swapAdjacent(swapAdjacent([0, 1, 2], 0, 1), 1, -1), [0, 1, 2]);
+});
+
+test('数独题目唯一解, 难度按单数及隐性单数技巧分级', () => {
+  let state = 42;
+  const random = () => { state = (state * 1664525 + 1013904223) >>> 0; return state / 2 ** 32; };
+  for (const difficulty of ['easy', 'normal', 'hard']) {
+    for (let i = 0; i < 20; i++) {
+      const board = createSudoku(difficulty, random);
+      assert.equal(solveSudoku(board).length, 1);
+      assert.equal(rateSudoku(board), difficulty);
+    }
+  }
+  const invalid = Array(81).fill(0);
+  invalid[0] = invalid[1] = 1;
+  assert.equal(solveSudoku(invalid).length, 0);
 });
 
 test('生成迷宫始终可从起点到达终点, 墙体阻止移动', () => {
