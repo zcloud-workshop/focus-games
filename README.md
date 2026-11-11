@@ -8,7 +8,8 @@
 - 图形旋转、折纸、矩阵、镜像、立体计数与规律推理.
 - 行列拼图、数字滑块、数独、数字合并、熄灯、火柴等式和迷宫.
 - 呼吸引导, 以及单独记录的番茄钟、竹知了工具.
-- 模式与参数设置、收藏、搜索、每日三项挑战、本机记录与导出.
+- 模式、难度与自定义设置全部开放, 无需解锁即可直接测试.
+- 收藏、搜索、每日三项挑战、本机记录与导出.
 - 明亮/深色主题和手机布局, 数字广度与连线可打印题目及独立答案页.
 
 网站使用原生 JavaScript 和 CSS, Vite 生成静态资源, Cloudflare Workers Static Assets 托管. 没有后端、登录或第三方运行时资源依赖.
@@ -27,14 +28,27 @@ pnpm dev
 ## 验证与构建
 
 ```sh
-pnpm test
-pnpm build
-pnpm exec wrangler deploy --dry-run
+pnpm test                            # node --test tests/*.test.js
+node --test tests/core.test.js      # 运行单个测试文件
+TZ=UTC pnpm test                     # 推送前必跑, Cloudflare 构建环境为 UTC
+pnpm build                           # vite build → dist/
+pnpm exec wrangler deploy --dry-run  # 资源与配置检查, 未登录也可运行
 ```
+
+测试不依赖浏览器或 jsdom: DOM 相关逻辑通过 `EventTarget` 桩与合成事件验证, 游戏逻辑保持为注入 `random` 与 `clock` 的纯函数. 日期与连续天数相关断言不得依赖本地时区.
 
 `dist/` 为构建产物, 不提交到 Git. 根目录 `wrangler.jsonc` 配置 `assets.directory` 和 SPA 回退, 不需要 Worker 脚本或额外数据库绑定.
 
 版本预览使用 `https://<版本前缀>-focus-games.icoco.workers.dev`, 每次成功构建后对应独立版本. 生产流量比例不影响访问该版本的预览地址.
+
+## 项目结构
+
+- `src/core.js` — 冻结目录: 57 个条目 (55 训练 + 2 工具)、分类、每日挑战与旧版成绩规则.
+- `src/main.js` — 单页应用与 hash 路由 (`#training` / `#favorites` / `#records` / `#game/<id>`), 点击后全屏弹窗进入游戏.
+- `src/games.js` 与 `src/games/<id>.js` — 按需加载的游戏模块, 每个导出 `definition` 与 `mount()`.
+- `src/engines/` — 共享引擎 (运行时统一清理、N-Back、序列、选择反应、抑制、棋盘、音频、打印等), 同族游戏复用同一实现.
+- `src/storage.js` — `focus-lab-v2` 本地存储、v1 迁移与个人最佳分组.
+- `tests/` — 覆盖目录契约 (`tests/catalog.test.js` 校验每个模块的定义契约) 与各游戏规则.
 
 ## GitHub 推送后自动部署
 
@@ -76,6 +90,6 @@ pnpm deploy
 
 ## 验收与发布
 
-当前多数来源参数仍待完整运行核验, 不将同名入口、构建成功或可开始训练等同于已对齐, 也不将发布等同于全部对齐.
+多数来源参数仍待完整运行核验, 不将同名入口、构建成功或可开始训练等同于对齐, 也不将发布等同于全部对齐.
 
-开发分支的预览构建命令为 `pnpm test && pnpm build`, 非生产部署命令应为 `pnpm exec wrangler versions upload`. 本机未登录 Cloudflare 时, dry-run 仍可检查静态资源; 实际版本预览须等待 Workers Builds 或完成现有账号登录后取得版本 ID.
+开发分支预览构建命令为 `pnpm test && pnpm build`, 非生产部署使用 `pnpm exec wrangler versions upload`. 本机未登录 Cloudflare 时 dry-run 仍可检查资源, 实际版本预览需等待 Workers Builds 构建完成或登录后取得版本 ID.
