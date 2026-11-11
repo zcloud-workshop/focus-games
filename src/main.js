@@ -152,7 +152,6 @@ function render() {
   document.querySelector('#record-mode')?.addEventListener('change', (event) => { recordMode = event.target.value; render(); });
   const dialog = document.querySelector('#game-dialog');
   dialog.addEventListener('cancel', (event) => { event.preventDefault(); closeGame(); });
-  dialog.addEventListener('click', (event) => { if (event.target === dialog && !running) closeGame(); });
   if (isGame) {
     const game = games.find((item) => item.id === route.split('/')[1]);
     if (game) openGame(game);
@@ -184,10 +183,6 @@ async function definitionFor(id) {
     registerDefinition(module.definition);
   }
   return loaded.get(id);
-}
-
-function locked() {
-  return false;
 }
 
 function modeScore() {
@@ -228,8 +223,8 @@ async function openGame(game) {
     if (version !== dialogVersion || !dialog.open) return;
     saved = store.load();
     const challenge = dailySession ? dailyChallenges[dailySession.index] : null;
-    const mode = challenge ? definition.modes.find((m) => m.id === challenge.mode && !locked(m)) : definition.modes.find((m) => !locked(m));
-    const preset = mode?.presets.find((p) => p.id === challenge?.preset && !locked(p)) ?? (!challenge && mode?.presets.find((p) => !locked(p)));
+    const mode = challenge ? definition.modes.find((m) => m.id === challenge.mode) : definition.modes[0];
+    const preset = challenge ? mode?.presets.find((p) => p.id === challenge.preset) : mode?.presets[0];
     if (!mode || !preset) throw new Error('训练配置不可用');
     selection = { game, definition, mode, preset, settings: defaultSettings(mode, preset) };
     renderSettings();
@@ -243,16 +238,21 @@ function renderSettings() {
   saved = store.load();
   const { game, definition, mode, preset, settings } = selection;
   const fields = fieldsFor();
-  document.querySelector('#dialog-content').innerHTML = dialogHeader(game) + `<div class="game-intro"><div class="intro-visual">${cardPreview(game)}</div>${dailySession ? `<div class="challenge-progress">今日挑战 <b>${dailySession.index + 1} / ${dailyGames.length}</b></div>` : ''}<label class="mode-label">模式<select id="game-mode">${definition.modes.map((m) => `<option value="${m.id}" ${m.id === mode.id ? 'selected' : ''} ${locked(m) ? 'disabled' : ''}>${escapeHtml(m.name)}${locked(m) ? ' (未解锁)' : ''}</option>`).join('')}</select></label><p class="game-rule">${escapeHtml(mode.rule)}</p><fieldset class="difficulty-fieldset"><legend>配置</legend><div class="difficulty-options">${mode.presets.map((p) => `<button data-action="preset" data-preset="${p.id}" class="difficulty-option ${p.id === preset.id ? 'active' : ''}" aria-pressed="${p.id === preset.id}" ${locked(p) ? 'disabled' : ''}>${escapeHtml(p.name)}${locked(p) ? ' · 未解锁' : ''}</button>`).join('')}</div></fieldset>${fields.length ? `<div class="settings-fields">${fields.map((f) => `<label>${escapeHtml(f.label)}${f.type === 'select' ? `<select data-setting="${f.key}">${f.options.map((o) => `<option value="${o.value}" ${String(settings[f.key] ?? f.default) === String(o.value) ? 'selected' : ''}>${escapeHtml(o.label)}</option>`).join('')}</select>` : f.type === 'checkbox' ? `<input type="checkbox" data-setting="${f.key}" ${(settings[f.key] ?? f.default) ? 'checked' : ''}>` : `<input type="number" data-setting="${f.key}" min="${f.min}" max="${f.max}" step="${f.step ?? 1}" value="${settings[f.key] ?? f.default}">`}${f.unit ? `<small>${escapeHtml(f.unit)}</small>` : ''}</label>`).join('')}</div>` : ''}<p class="settings-error" id="settings-error" role="alert"></p><p class="personal-best" id="personal-best">${bestText()}</p><button class="button primary start-game" data-action="start" data-id="${game.id}">开始 ${icon('arrow')}</button><span class="intro-footnote">${game.kind === 'tool' ? '工具记录单独保存' : mode.scored === false || preset.scored === false ? '练习模式, 不计成绩' : '有效结算后自动保存'}${mode.warning ? `<br>${escapeHtml(mode.warning)}` : ''}</span></div>`;
+  document.querySelector('#dialog-content').innerHTML = dialogHeader(game) + `<div class="game-intro"><div class="intro-visual">${cardPreview(game)}</div>${dailySession ? `<div class="challenge-progress">今日挑战 <b>${dailySession.index + 1} / ${dailyGames.length}</b></div>` : ''}<label class="mode-label">模式<select id="game-mode">${definition.modes.map((m) => `<option value="${m.id}" ${m.id === mode.id ? 'selected' : ''}>${escapeHtml(m.name)}</option>`).join('')}</select></label><p class="game-rule">${escapeHtml(mode.rule)}</p><fieldset class="difficulty-fieldset"><legend>配置</legend><div class="difficulty-options">${mode.presets.map((p) => `<button data-action="preset" data-preset="${p.id}" class="difficulty-option ${p.id === preset.id ? 'active' : ''}" aria-pressed="${p.id === preset.id}">${escapeHtml(p.name)}</button>`).join('')}</div></fieldset>${fields.length ? `<div class="settings-fields">${fields.map((f) => `<label>${escapeHtml(f.label)}${f.type === 'select' ? `<select data-setting="${f.key}">${f.options.map((o) => `<option value="${o.value}" ${String(settings[f.key] ?? f.default) === String(o.value) ? 'selected' : ''}>${escapeHtml(o.label)}</option>`).join('')}</select>` : f.type === 'checkbox' ? `<input type="checkbox" data-setting="${f.key}" ${(settings[f.key] ?? f.default) ? 'checked' : ''}>` : `<input type="number" data-setting="${f.key}" min="${f.min}" max="${f.max}" step="${f.step ?? 1}" value="${settings[f.key] ?? f.default}">`}${f.unit ? `<small>${escapeHtml(f.unit)}</small>` : ''}</label>`).join('')}</div>` : ''}<p class="settings-error" id="settings-error" role="alert"></p><p class="personal-best" id="personal-best">${bestText()}</p><button class="button primary start-game" data-action="start" data-id="${game.id}">开始 ${icon('arrow')}</button><span class="intro-footnote">${game.kind === 'tool' ? '工具记录单独保存' : mode.scored === false || preset.scored === false ? '练习模式, 不计成绩' : '有效结算后自动保存'}${mode.warning ? `<br>${escapeHtml(mode.warning)}` : ''}</span></div>`;
   document.querySelector('#game-mode').addEventListener('change', (event) => {
     selection.mode = definition.modes.find((m) => m.id === event.target.value);
-    selection.preset = selection.mode.presets.find((p) => !locked(p));
+    selection.preset = selection.mode.presets[0];
     selection.settings = defaultSettings(selection.mode, selection.preset);
     renderSettings();
   });
   document.querySelectorAll('[data-setting]').forEach((input) => input.addEventListener('change', () => {
     const field = fields.find((f) => f.key === input.dataset.setting);
-    settings[field.key] = field.type === 'checkbox' ? input.checked : field.type === 'select' ? field.options.find((o) => String(o.value) === input.value)?.value : Number(input.value);
+    if (field.type === 'checkbox') settings[field.key] = input.checked;
+    else if (field.type === 'select') settings[field.key] = field.options.find((o) => String(o.value) === input.value)?.value;
+    else if (input.value.trim() === '' || !Number.isFinite(Number(input.value))) {
+      settings[field.key] = field.default ?? field.min;
+      input.value = settings[field.key];
+    } else settings[field.key] = Number(input.value);
     document.querySelector('#personal-best').innerHTML = bestText();
   }));
   document.querySelector('.start-game').focus();
@@ -286,7 +286,6 @@ function start(game) {
   }
   const issue = mode.validateSettings?.(settings, store.data) ?? selection.definition.validateSettings?.(settings, mode);
   if (issue) { document.querySelector('#settings-error').textContent = issue; return; }
-  if (locked(mode) || locked(preset)) return;
   stopGame();
   running = true;
   const version = ++dialogVersion;
