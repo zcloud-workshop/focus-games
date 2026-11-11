@@ -183,7 +183,7 @@ td:first-child { color: var(--ink); font-weight: 500; }
 .about-panel { padding: 45px 0 60px; }
 .about-panel h2 { font-size: 24px; font-weight: 500; letter-spacing: -.6px; margin: 0 0 18px; }
 .about-panel .text-button { margin-top: 15px; }
-dialog { padding: 0; width: min(560px, calc(100% - 32px)); max-height: calc(100dvh - 48px); background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 25px; box-shadow: 0 30px 100px #0000002b; overscroll-behavior: contain; }
+dialog { padding: 0; width: 100%; height: 100dvh; max-width: none; max-height: none; margin: 0; background: var(--surface); color: var(--ink); border: 0; overscroll-behavior: contain; }
 dialog::backdrop { background: #00000065; backdrop-filter: blur(9px); -webkit-backdrop-filter: blur(9px); }
 .modal-open { overflow: hidden; }
 .dialog-header { display: flex; align-items: center; gap: 12px; padding: 23px 28px; border-bottom: 1px solid var(--line); background: var(--surface); position: sticky; top: 0; z-index: 3; }
@@ -193,7 +193,8 @@ dialog::backdrop { background: #00000065; backdrop-filter: blur(9px); -webkit-ba
 .close-button { display: grid; place-items: center; margin-left: auto; width: 30px; height: 30px; border-radius: 50%; background: var(--soft); color: var(--muted); flex-shrink: 0; }
 .close-button:hover { background: var(--hover); }
 .close-button .icon { width: 16px; height: 16px; }
-.game-intro { padding: 30px 35px; text-align: center; }
+.game-intro { padding: 30px 35px; text-align: center; max-width: 640px; margin: 0 auto; }
+dialog .empty-state { max-width: 640px; margin: 0 auto; }
 .intro-visual { width: 150px; height: 140px; display: grid; place-items: center; margin: 0 auto 25px; }
 .game-rule { color: var(--muted); font-size: 14px; line-height: 1.9; margin: 0 auto 27px; max-width: 420px; }
 .difficulty-fieldset { padding: 0; border: 0; margin: 0; }
@@ -208,7 +209,7 @@ dialog::backdrop { background: #00000065; backdrop-filter: blur(9px); -webkit-ba
 .intro-footnote { display: block; color: var(--faint); font-size: 11px; margin-top: 14px; }
 .challenge-progress { color: var(--accent); font-size: 12px; margin: 0 0 20px; }
 .challenge-progress b { font-weight: 500; margin-left: 10px; }
-.active-game { padding: 22px 28px 25px; }
+.active-game { padding: 22px 28px 25px; max-width: 900px; margin: 0 auto; }
 .active-game-meta { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 11px; margin-bottom: 25px; }
 .active-game-meta > span:last-child { margin-left: auto; }
 .live-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); }
@@ -265,7 +266,7 @@ dialog::backdrop { background: #00000065; backdrop-filter: blur(9px); -webkit-ba
 .breath-circle { width: 150px; height: 150px; border-radius: 50%; background: var(--tint); box-shadow: 0 0 0 16px var(--soft); display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--accent); }
 .breath-circle strong { font-size: 22px; font-weight: 400; letter-spacing: 2px; }
 .breath-circle span { font-size: 18px; opacity: .7; margin-top: 12px; }
-.result-content { padding: 35px; text-align: center; }
+.result-content { padding: 35px; text-align: center; max-width: 640px; margin: 0 auto; }
 .result-check { width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; margin: 0 auto 20px; color: var(--accent); background: var(--tint); }
 .result-check .icon { width: 24px; height: 24px; }
 .result-content h3 { font-size: 32px; font-weight: 500; letter-spacing: -1px; margin: 0 0 15px; }
@@ -368,7 +369,7 @@ dialog::backdrop { background: #00000065; backdrop-filter: blur(9px); -webkit-ba
   table { font-size: 12px; }
   td, th { padding: 17px; }
   .empty-state { min-height: 250px; }
-  dialog { width: calc(100% - 24px); max-height: calc(100dvh - 24px); border-radius: 21px; }
+  dialog { width: 100%; height: 100dvh; border-radius: 0; }
   .dialog-header { padding: 20px; gap: 10px; }
   .dialog-header h2 { font-size: 17px; }
   .dialog-game-icon { width: 30px; height: 30px; }
