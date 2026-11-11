@@ -17,7 +17,7 @@ export const definition = {
       ] },
     ],
     score: { unit: '轮', lower: false, min: 0 }, hiddenPolicy: 'invalidate', inputs: ['unknown'],
-    rule: '跟随引导呼吸, 完成 3 轮可解锁下一档. 如感到不适, 请随时停止.',
+    rule: '跟随引导呼吸完成练习. 如感到不适, 请随时停止.',
   }, {
     id: 'guided', name: '定时呼吸', ruleVersion: 3,
     presets: [

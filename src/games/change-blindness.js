@@ -10,7 +10,7 @@ export const definition = { id: 'change-blindness', modes: [{ id: 'alternating',
     { key: 'size', label: '网格大小', type: 'number', min: 3, max: 4, step: 1, maxByUnlock: [{ key: mediumKey, max: 5 }, { key: hardKey, max: 6 }] },
     { key: 'rounds', label: '局数', type: 'number', min: 3, max: 5, step: 1, maxByUnlock: [{ key: mediumKey, max: 8 }, { key: hardKey, max: 10 }] },
   ] },
-], score: { unit: '局', lower: false, min: 0, max: 10 }, hiddenPolicy: 'invalidate', inputs: ['pointer', 'touch', 'keyboard'], warning: '画面会短暂遮盖.', rule: '先观察画面1.2秒, 遮盖0.3秒后找出变化的一格. 每轮五局, 点错立即结束. 初级和中级各完成至少四局可解锁下一档.' }] };
+], score: { unit: '局', lower: false, min: 0, max: 10 }, hiddenPolicy: 'invalidate', inputs: ['pointer', 'touch', 'keyboard'], warning: '画面会短暂遮盖.', rule: '先观察画面1.2秒, 遮盖0.3秒后找出变化的一格. 每轮五局, 点错立即结束.' }] };
 
 export function changeScene(size, random = Math.random) {
   const poolSize = size <= 4 ? 8 : 6;

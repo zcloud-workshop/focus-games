@@ -16,7 +16,7 @@ export const definition = { id: 'rsvp', modes: [{
   ],
   score: { unit: '%', lower: false, min: 0, max: 100 }, hiddenPolicy: 'invalidate', inputs: ['pointer', 'touch', 'keyboard'],
   warning: '字母会快速切换, 画面仅在中央小区域变化.',
-  rule: '观察字母流, 在六个选项中选择任意一个出现过的红色字母. 每轮后可继续或保存本次正确率. 初级和中级各答对一轮可解锁下一预设.',
+  rule: '观察字母流, 在六个选项中选择任意一个出现过的红色字母. 每轮后可继续或保存本次正确率.',
 }] };
 
 export function letterRound(settings, random = Math.random) {

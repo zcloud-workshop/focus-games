@@ -186,8 +186,8 @@ async function definitionFor(id) {
   return loaded.get(id);
 }
 
-function locked(item) {
-  return Boolean(item?.unlock?.requires?.some((key) => !saved.unlocks[key]));
+function locked() {
+  return false;
 }
 
 function modeScore() {
@@ -197,7 +197,7 @@ function modeScore() {
 function fieldsFor() {
   return (selection.preset.fields ?? selection.mode.fields ?? []).map((field) => {
     const resolved = { ...field };
-    for (const bound of ['min','max']) for (const limit of field[`${bound}ByUnlock`] ?? []) if (saved.unlocks[limit.key]) resolved[bound] = limit[bound];
+    for (const bound of ['min','max']) for (const limit of field[`${bound}ByUnlock`] ?? []) resolved[bound] = limit[bound];
     return resolved;
   });
 }
