@@ -197,7 +197,10 @@ function modeScore() {
 function fieldsFor() {
   return (selection.preset.fields ?? selection.mode.fields ?? []).map((field) => {
     const resolved = { ...field };
-    for (const bound of ['min','max']) for (const limit of field[`${bound}ByUnlock`] ?? []) resolved[bound] = limit[bound];
+    for (const bound of ['min','max']) {
+      const limits = (field[`${bound}ByUnlock`] ?? []).map((limit) => limit[bound]).filter(Number.isFinite);
+      if (limits.length) resolved[bound] = bound === 'max' ? Math.max(field.max, ...limits) : Math.min(field.min, ...limits);
+    }
     return resolved;
   });
 }
