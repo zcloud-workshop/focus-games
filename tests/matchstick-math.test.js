@@ -32,3 +32,22 @@ test('六年级组题均有解, 并枚举所有合法单根移动解', () => {
   }
   assert.equal(multi, true);
 });
+
+test('封闭算式 (如 4+4=8) 无效邻居为空时换题, 不再崩溃', () => {
+  const seq = [0.35, 0.35, 0.25];
+  let i = 0;
+  const random = () => seq[i++] ?? 0.99;
+  const { tokens, solutions } = matchQuestion(1, random);
+  assert.equal(readEquation(tokens).valid, false);
+  assert.ok(solutions.length > 0);
+});
+
+test('大样本随机出题不抛异常且均有解', () => {
+  for (let grade = 1; grade <= 6; grade++) {
+    for (let i = 0; i < 500; i++) {
+      const { tokens, solutions } = matchQuestion(grade, Math.random);
+      assert.equal(readEquation(tokens).valid, false);
+      assert.ok(solutions.length > 0);
+    }
+  }
+});

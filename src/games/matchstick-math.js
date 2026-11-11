@@ -66,19 +66,24 @@ export function matchQuestion(grade, random = Math.random) {
     const min = 10 ** (digits - 1);
     return min + Math.floor(random() * (9 * min));
   };
-  let valid;
-  for (let attempt = 0; attempt < 100; attempt++) {
-    const a = value(aDigits);
-    const b = value(bDigits);
-    const sign = random() < 0.5 ? '+' : '-';
-    const c = sign === '+' ? a + b : a - b;
-    if (c >= 0 && String(c).length === cDigits) { valid = encode(a, b, sign, c); break; }
+  for (let attempt = 0; attempt < 200; attempt++) {
+    let valid;
+    for (let inner = 0; inner < 100; inner++) {
+      const a = value(aDigits);
+      const b = value(bDigits);
+      const sign = random() < 0.5 ? '+' : '-';
+      const c = sign === '+' ? a + b : a - b;
+      if (c >= 0 && String(c).length === cDigits) { valid = encode(a, b, sign, c); break; }
+    }
+    if (!valid) valid = encode(...fallback[grade - 1]);
+    // 少数算式 (如 4+4=8) 的每个可读移动邻居都合法, 没有可出题的无效形态, 换一题.
+    const wrong = matchNeighbors(valid).filter((tokens) => !readEquation(tokens).valid);
+    if (!wrong.length) continue;
+    const question = wrong[Math.floor(random() * wrong.length)];
+    const solutions = matchNeighbors(question).filter((tokens) => readEquation(tokens).valid);
+    return { tokens: question, solutions };
   }
-  if (!valid) valid = encode(...fallback[grade - 1]);
-  const wrong = matchNeighbors(valid).filter((tokens) => !readEquation(tokens).valid);
-  const question = wrong[Math.floor(random() * wrong.length)];
-  const solutions = matchNeighbors(question).filter((tokens) => readEquation(tokens).valid);
-  return { tokens: question, solutions };
+  throw new Error('未能生成火柴算式.');
 }
 
 export function mount({ root, mode, preset, settings, onFinish, random = Math.random, clock = globalThis }) {
