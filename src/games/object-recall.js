@@ -37,10 +37,19 @@ export function makeObjects(random = Math.random) {
 export function scoreRecall(selected, answers) {
   const normalize = (value) => value.trim().normalize('NFKC').toLowerCase().replace(/\s+/g, '');
   const words = answers.map(normalize).filter(Boolean);
-  return selected.filter(({ name, aliases }) => [name, ...aliases].some((item) => {
-    const term = normalize(item);
-    return words.some((word) => term.includes(word) || word.includes(term));
-  })).map((item) => item.name);
+  const matched = [];
+  const hits = (item, word, exact) => {
+    const terms = [item.name, ...item.aliases].map(normalize);
+    return exact ? terms.includes(word) : terms.some((term) => term.includes(word) || word.includes(term));
+  };
+  // 整词/别名匹配优先, 子串匹配兜底; 每个输入与每件物品都只计一次.
+  for (const exact of [true, false]) {
+    for (const word of words) {
+      const hit = selected.find((item) => !matched.includes(item.name) && hits(item, word, exact));
+      if (hit) matched.push(hit.name);
+    }
+  }
+  return matched;
 }
 
 export function mount({ root, mode, preset, settings, onFinish, random = Math.random, clock = globalThis }) {
